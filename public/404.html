@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redirigiendo…</title>
+    <script>
+      const base = '/gestion-lab/'
+      const path = location.pathname.replace(base, '')
+      location.replace(`${base}?redirect=${encodeURIComponent(path)}${location.search}${location.hash}`)
+    </script>
+  </head>
+  <body></body>
+</html>

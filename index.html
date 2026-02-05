@@ -10,6 +10,13 @@
       content="PWA mobile-first para control personal de producción"
     />
     <title>Gestión Lab</title>
+    <script>
+      const params = new URLSearchParams(location.search)
+      const redirect = params.get('redirect')
+      if (redirect) {
+        history.replaceState(null, '', `/${redirect}`)
+      }
+    </script>
   </head>
   <body>
     <div id="root"></div>
