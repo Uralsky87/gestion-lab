@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Gestión Lab">
+  <rect width="128" height="128" rx="28" fill="#3b6ef6" />
+  <rect x="18" y="18" width="92" height="92" rx="22" fill="#ffffff" opacity="0.16" />
+  <path d="M40 70c0-15.5 12.5-28 28-28h24v12H68c-8.8 0-16 7.2-16 16s7.2 16 16 16h10v12H68c-15.5 0-28-12.5-28-28z" fill="#ffffff" />
+</svg>
