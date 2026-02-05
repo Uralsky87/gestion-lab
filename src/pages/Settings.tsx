@@ -68,8 +68,6 @@ export default function Settings() {
 
   return (
     <>
-      <h2 className="page-title">Ajustes</h2>
-
       <section className="card">
         <h3>Respaldo local</h3>
         <p>

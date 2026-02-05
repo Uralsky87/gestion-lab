@@ -25,6 +25,7 @@ export default function Templates() {
   const [search, setSearch] = useState('')
   const [form, setForm] = useState<TemplateFormState>(emptyForm)
   const [error, setError] = useState('')
+  const [showForm, setShowForm] = useState(false)
 
   const loadTemplates = async () => {
     const data = await listBatchTemplates()
@@ -50,6 +51,7 @@ export default function Templates() {
   const resetForm = () => {
     setForm(emptyForm)
     setError('')
+    setShowForm(false)
   }
 
   const handleSave = async () => {
@@ -104,6 +106,7 @@ export default function Templates() {
           : [{ name: '', notes: '' }],
     })
     setError('')
+    setShowForm(true)
   }
 
   const handleDelete = async (template: BatchTemplate) => {
@@ -145,12 +148,111 @@ export default function Templates() {
 
   return (
     <>
-      <h2 className="page-title">Plantillas</h2>
+      <section className="card">
+        <button
+          className="primary-button"
+          type="button"
+          onClick={() => setShowForm((prev) => !prev)}
+        >
+          {showForm ? 'Cerrar formulario' : 'Crear lote'}
+        </button>
+      </section>
+
+      {showForm ? (
+        <section className="card">
+          <h3>{form.id ? 'Editar lote' : 'Crear lote'}</h3>
+          <div className="form-grid">
+            <div className="form-row">
+              <label className="form-label" htmlFor="templateName">
+                Nombre
+              </label>
+              <input
+                id="templateName"
+                className="form-input"
+                value={form.name}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, name: event.target.value }))
+                }
+                placeholder="Ej: Lote pan artesanal"
+              />
+            </div>
+            <div className="form-row">
+              <label className="form-label" htmlFor="templateTags">
+                Tags (opcional)
+              </label>
+              <input
+                id="templateTags"
+                className="form-input"
+                value={form.tagsText}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, tagsText: event.target.value }))
+                }
+                placeholder="pan, diario"
+              />
+            </div>
+          </div>
+
+          <div className="form-row">
+            <label className="form-label">Materias primas</label>
+            <div className="material-list">
+              {form.materials.map((material, index) => (
+                <div className="material-row" key={`${material.name}-${index}`}>
+                  <input
+                    className="form-input"
+                    placeholder="Nombre"
+                    value={material.name}
+                    onChange={(event) =>
+                      updateMaterial(index, { name: event.target.value })
+                    }
+                  />
+                  <input
+                    className="form-input"
+                    placeholder="Notas (opcional)"
+                    value={material.notes ?? ''}
+                    onChange={(event) =>
+                      updateMaterial(index, { notes: event.target.value })
+                    }
+                  />
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => removeMaterial(index)}
+                  >
+                    Quitar
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={addMaterial}
+            >
+              + Añadir materia prima
+            </button>
+          </div>
+
+          {error ? <div className="form-error">{error}</div> : null}
+
+          <div className="form-actions">
+            <button
+              className="primary-button"
+              type="button"
+              onClick={handleSave}
+            >
+              {form.id ? 'Guardar cambios' : 'Guardar lote'}
+            </button>
+            <button className="ghost-button" type="button" onClick={resetForm}>
+              Cancelar
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section className="card">
         <div className="form-row">
           <label className="form-label" htmlFor="searchTemplates">
-            Buscar
+            Buscar lotes
           </label>
           <input
             id="searchTemplates"
@@ -161,98 +263,12 @@ export default function Templates() {
             onChange={(event) => setSearch(event.target.value)}
           />
         </div>
-        <button className="primary-button" type="button" onClick={resetForm}>
-          Nueva plantilla
-        </button>
       </section>
 
       <section className="card">
-        <h3>Formulario</h3>
-        <div className="form-grid">
-          <div className="form-row">
-            <label className="form-label" htmlFor="templateName">
-              Nombre
-            </label>
-            <input
-              id="templateName"
-              className="form-input"
-              value={form.name}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, name: event.target.value }))
-              }
-              placeholder="Ej: Lote pan artesanal"
-            />
-          </div>
-          <div className="form-row">
-            <label className="form-label" htmlFor="templateTags">
-              Tags (opcional)
-            </label>
-            <input
-              id="templateTags"
-              className="form-input"
-              value={form.tagsText}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, tagsText: event.target.value }))
-              }
-              placeholder="pan, diario"
-            />
-          </div>
-        </div>
-
-        <div className="form-row">
-          <label className="form-label">Materias primas</label>
-          <div className="material-list">
-            {form.materials.map((material, index) => (
-              <div className="material-row" key={`${material.name}-${index}`}>
-                <input
-                  className="form-input"
-                  placeholder="Nombre"
-                  value={material.name}
-                  onChange={(event) =>
-                    updateMaterial(index, { name: event.target.value })
-                  }
-                />
-                <input
-                  className="form-input"
-                  placeholder="Notas (opcional)"
-                  value={material.notes ?? ''}
-                  onChange={(event) =>
-                    updateMaterial(index, { notes: event.target.value })
-                  }
-                />
-                <button
-                  className="ghost-button"
-                  type="button"
-                  onClick={() => removeMaterial(index)}
-                >
-                  Quitar
-                </button>
-              </div>
-            ))}
-          </div>
-          <button className="secondary-button" type="button" onClick={addMaterial}>
-            + Añadir materia prima
-          </button>
-        </div>
-
-        {error ? <div className="form-error">{error}</div> : null}
-
-        <div className="form-actions">
-          <button className="primary-button" type="button" onClick={handleSave}>
-            {form.id ? 'Guardar cambios' : 'Guardar plantilla'}
-          </button>
-          {form.id ? (
-            <button className="ghost-button" type="button" onClick={resetForm}>
-              Cancelar edición
-            </button>
-          ) : null}
-        </div>
-      </section>
-
-      <section className="card">
-        <h3>Plantillas guardadas</h3>
+        <h3>Lotes guardados</h3>
         {filteredTemplates.length === 0 ? (
-          <p>No hay plantillas que mostrar.</p>
+          <p>No hay lotes que mostrar.</p>
         ) : (
           <div className="list">
             {filteredTemplates.map((template) => (

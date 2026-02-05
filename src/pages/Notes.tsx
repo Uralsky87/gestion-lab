@@ -164,8 +164,6 @@ export default function Notes() {
 
   return (
     <>
-      <h2 className="page-title">Notas</h2>
-
       <section className="card">
         <div className="form-grid">
           <div className="form-row">

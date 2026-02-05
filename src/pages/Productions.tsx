@@ -1,16 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type {
   BatchTemplate,
   ChangeLogEntry,
   ProductionRun,
   ProductionShift,
   ProductionStatus,
+  Technician,
 } from '../data/models'
 import {
   createProductionRun,
   deleteProductionRun,
   listBatchTemplates,
   listProductionRuns,
+  listTechnicians,
   updateProductionRun,
 } from '../data/repository'
 
@@ -63,25 +65,34 @@ const toDateOnly = (value: string) => new Date(`${value}T00:00:00`)
 export default function Productions() {
   const [runs, setRuns] = useState<ProductionRun[]>([])
   const [templates, setTemplates] = useState<BatchTemplate[]>([])
+  const [technicians, setTechnicians] = useState<Technician[]>([])
   const [shiftFilter, setShiftFilter] = useState<'todas' | ProductionShift>(
     'todas',
   )
   const [form, setForm] = useState<ProductionFormState>(emptyForm())
   const [error, setError] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [selectedDate, setSelectedDate] = useState(todayIso())
+  const dateInputRef = useRef<HTMLInputElement | null>(null)
 
   const loadData = async () => {
-    const [runData, templateData] = await Promise.all([
+    const [runData, templateData, techData] = await Promise.all([
       listProductionRuns(),
       listBatchTemplates(),
+      listTechnicians(),
     ])
     setRuns(runData)
     setTemplates(templateData)
+    setTechnicians(techData)
     if (!form.templateId && templateData.length > 0) {
       setForm((prev) => ({
         ...prev,
         templateId: templateData[0].id,
         replacementTemplateId: prev.replacementTemplateId || templateData[0].id,
       }))
+    }
+    if (!form.technician && techData.length > 0) {
+      setForm((prev) => ({ ...prev, technician: techData[0].initials }))
     }
   }
 
@@ -90,7 +101,7 @@ export default function Productions() {
   }, [])
 
   const filteredRuns = useMemo(() => {
-    const weekStart = startOfWeek(new Date())
+    const weekStart = startOfWeek(new Date(`${selectedDate}T00:00:00`))
     const weekEnd = new Date(weekStart)
     weekEnd.setDate(weekStart.getDate() + 6)
 
@@ -103,10 +114,10 @@ export default function Productions() {
         return inWeek && shiftMatch
       })
       .sort((a, b) => b.date.localeCompare(a.date))
-  }, [runs, shiftFilter])
+  }, [runs, shiftFilter, selectedDate])
 
   const weekStats = useMemo(() => {
-    const weekStart = startOfWeek(new Date())
+    const weekStart = startOfWeek(new Date(`${selectedDate}T00:00:00`))
     const weekEnd = new Date(weekStart)
     weekEnd.setDate(weekStart.getDate() + 6)
 
@@ -136,7 +147,7 @@ export default function Productions() {
       byTechnician: Object.entries(byTechnician).sort((a, b) => b[1] - a[1]),
       byShift: Object.entries(byShift).sort((a, b) => b[1] - a[1]),
     }
-  }, [runs])
+  }, [runs, selectedDate])
 
   const templateStats = useMemo(() => {
     const now = new Date()
@@ -166,6 +177,7 @@ export default function Productions() {
   const resetForm = () => {
     setForm(emptyForm(templates[0]?.id ?? ''))
     setError('')
+    setShowForm(false)
   }
 
   const handleSave = async () => {
@@ -202,7 +214,7 @@ export default function Productions() {
       return
     }
     if (!technician) {
-      setError('Ingresa las iniciales del técnico.')
+      setError('Selecciona un técnico.')
       return
     }
     if (isChangeStatus && !changeReason) {
@@ -300,6 +312,7 @@ export default function Productions() {
       replacementText: '',
     })
     setError('')
+    setShowForm(true)
   }
 
   const handleDelete = async (run: ProductionRun) => {
@@ -319,35 +332,19 @@ export default function Productions() {
 
   return (
     <>
-      <h2 className="page-title">Producciones</h2>
-
       <section className="card">
-        <div className="form-grid">
-          <div className="form-row">
-            <label className="form-label" htmlFor="shiftFilter">
-              Turno
-            </label>
-            <select
-              id="shiftFilter"
-              className="form-input"
-              value={shiftFilter}
-              onChange={(event) =>
-                setShiftFilter(event.target.value as 'todas' | ProductionShift)
-              }
-            >
-              <option value="todas">Todas</option>
-              <option value="mañana">Mañana</option>
-              <option value="tarde">Tarde</option>
-            </select>
-          </div>
-        </div>
-        <button className="primary-button" type="button" onClick={resetForm}>
-          Añadir producción
+        <button
+          className="primary-button"
+          type="button"
+          onClick={() => setShowForm((prev) => !prev)}
+        >
+          {showForm ? 'Cerrar formulario' : 'Añadir producción'}
         </button>
       </section>
 
-      <section className="card">
-        <h3>Formulario</h3>
+      {showForm ? (
+        <section className="card">
+          <h3>{form.id ? 'Editar producción' : 'Nueva producción'}</h3>
         <div className="form-grid">
           <div className="form-row">
             <label className="form-label" htmlFor="runDate">
@@ -404,7 +401,7 @@ export default function Productions() {
           </div>
           <div className="form-row">
             <label className="form-label" htmlFor="templateId">
-              Plantilla
+              Lote
             </label>
             <select
               id="templateId"
@@ -415,7 +412,7 @@ export default function Productions() {
               }
             >
               {templates.length === 0 ? (
-                <option value="">Sin plantillas</option>
+                <option value="">Sin lotes</option>
               ) : null}
               {templates.map((template) => (
                 <option key={template.id} value={template.id}>
@@ -464,21 +461,28 @@ export default function Productions() {
           </div>
           <div className="form-row">
             <label className="form-label" htmlFor="technician">
-              Técnico (iniciales)
+              Técnico
             </label>
-            <input
+            <select
               id="technician"
               className="form-input"
               value={form.technician}
               onChange={(event) =>
                 setForm((prev) => ({
                   ...prev,
-                  technician: event.target.value.toUpperCase(),
+                  technician: event.target.value,
                 }))
               }
-              placeholder="AM"
-              maxLength={6}
-            />
+            >
+              {technicians.length === 0 ? (
+                <option value="">Sin técnicos</option>
+              ) : null}
+              {technicians.map((tech) => (
+                <option key={tech.id} value={tech.initials}>
+                  {tech.initials}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="form-row">
             <label className="form-label" htmlFor="status">
@@ -602,26 +606,75 @@ export default function Productions() {
 
         {error ? <div className="form-error">{error}</div> : null}
 
-        <div className="form-actions">
-          <button className="primary-button" type="button" onClick={handleSave}>
-            {form.id ? 'Guardar cambios' : 'Guardar producción'}
-          </button>
-          {form.id ? (
-            <button className="ghost-button" type="button" onClick={resetForm}>
-              Cancelar edición
+          <div className="form-actions">
+            <button className="primary-button" type="button" onClick={handleSave}>
+              {form.id ? 'Guardar cambios' : 'Guardar producción'}
             </button>
-          ) : null}
-        </div>
-      </section>
+            <button className="ghost-button" type="button" onClick={resetForm}>
+              Cancelar
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       <section className="card">
         <h3>Semana actual</h3>
+        <div className="form-grid">
+          <div className="form-row">
+            <label className="form-label" htmlFor="weekPicker">
+              Elegir día
+            </label>
+            <div className="date-picker-row">
+              <input
+                ref={dateInputRef}
+                id="weekPicker"
+                className="form-input"
+                type="date"
+                value={selectedDate}
+                onChange={(event) => setSelectedDate(event.target.value)}
+              />
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() =>
+                  dateInputRef.current?.showPicker
+                    ? dateInputRef.current.showPicker()
+                    : dateInputRef.current?.focus()
+                }
+              >
+                Calendario
+              </button>
+            </div>
+          </div>
+          <div className="form-row">
+            <label className="form-label" htmlFor="shiftFilter">
+              Turno
+            </label>
+            <select
+              id="shiftFilter"
+              className="form-input"
+              value={shiftFilter}
+              onChange={(event) =>
+                setShiftFilter(event.target.value as 'todas' | ProductionShift)
+              }
+            >
+              <option value="todas">Todas</option>
+              <option value="mañana">Mañana</option>
+              <option value="tarde">Tarde</option>
+            </select>
+          </div>
+        </div>
         {filteredRuns.length === 0 ? (
           <p>No hay producciones para esta semana.</p>
         ) : (
           <div className="list">
             {filteredRuns.map((run) => (
-              <article key={run.id} className="list-item">
+              <article
+                key={run.id}
+                className={`list-item${
+                  run.date === selectedDate ? ' is-highlighted' : ''
+                }`}
+              >
                 <div className="list-item-main">
                   <div className="list-item-title">
                     {run.batchCode} · {getTemplateName(run.templateId)}

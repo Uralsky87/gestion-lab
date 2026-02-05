@@ -12,9 +12,6 @@ export default function TabBar() {
             `tab-link${isActive ? ' active' : ''}`
           }
         >
-          <span className="tab-icon" aria-hidden="true">
-            {tab.icon}
-          </span>
           <span>{tab.label}</span>
         </NavLink>
       ))}

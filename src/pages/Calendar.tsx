@@ -83,6 +83,16 @@ export default function Calendar() {
 
   const days = useMemo(() => getCalendarDays(currentMonth), [currentMonth])
 
+  const getShiftStatus = (dayRuns: ProductionRun[], shift: 'mañana' | 'tarde') => {
+    const shiftRuns = dayRuns.filter((run) => run.shift === shift)
+    if (shiftRuns.length === 0) return 'empty'
+    if (shiftRuns.some((run) => run.status === 'cancelado')) return 'cancelado'
+    if (shiftRuns.some((run) => run.status === 'previsto' || run.status === 'cambiado'))
+      return 'previsto'
+    if (shiftRuns.some((run) => run.status === 'hecho')) return 'hecho'
+    return 'empty'
+  }
+
   const selectedRuns = useMemo(() => {
     const dayRuns = runsByDate[selectedDate] ?? []
     if (!search.trim()) return dayRuns
@@ -104,8 +114,6 @@ export default function Calendar() {
 
   return (
     <>
-      <h2 className="page-title">Calendario</h2>
-
       <section className="card">
         <div className="form-row">
           <label className="form-label" htmlFor="calendarSearch">
@@ -115,7 +123,7 @@ export default function Calendar() {
             id="calendarSearch"
             className="form-input"
             type="search"
-            placeholder="Plantilla, técnico o batchCode"
+            placeholder="Lote, técnico o batchCode"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -153,6 +161,8 @@ export default function Calendar() {
               : dayRuns
             const hasMatch = search.trim() ? matchedDates.has(dateKey) : false
             const isSelected = selectedDate === dateKey
+            const morningStatus = getShiftStatus(filteredDayRuns, 'mañana')
+            const afternoonStatus = getShiftStatus(filteredDayRuns, 'tarde')
 
             return (
               <button
@@ -166,21 +176,27 @@ export default function Calendar() {
                 onClick={() => setSelectedDate(dateKey)}
               >
                 <span className="calendar-day-number">{day.getDate()}</span>
-                <div className="calendar-chips">
-                  {filteredDayRuns.slice(0, 3).map((run) => (
-                    <span key={run.id} className="calendar-chip">
-                      {getTemplateName(run.templateId)} · {run.shift}
-                    </span>
-                  ))}
-                  {filteredDayRuns.length > 3 ? (
-                    <span className="calendar-chip more">
-                      +{filteredDayRuns.length - 3}
-                    </span>
-                  ) : null}
+                <div className="calendar-dots">
+                  <span className={`calendar-dot status-${morningStatus}`} />
+                  <span className={`calendar-dot status-${afternoonStatus}`} />
                 </div>
               </button>
             )
           })}
+        </div>
+        <div className="calendar-legend">
+          <div className="legend-item">
+            <span className="calendar-dot status-previsto" />
+            <span>Pendiente</span>
+          </div>
+          <div className="legend-item">
+            <span className="calendar-dot status-hecho" />
+            <span>Hecho</span>
+          </div>
+          <div className="legend-item">
+            <span className="calendar-dot status-cancelado" />
+            <span>Anulado</span>
+          </div>
         </div>
       </section>
 
