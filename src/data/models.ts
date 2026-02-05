@@ -53,6 +53,13 @@ export type NoteEvent = {
   updatedAt: string
 }
 
+export type Technician = {
+  id: string
+  initials: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type NewBatchTemplate = Omit<BatchTemplate, 'id' | 'createdAt' | 'updatedAt'> & {
   id?: string
 }
@@ -77,3 +84,9 @@ export type NewNoteEvent = Omit<NoteEvent, 'id' | 'createdAt' | 'updatedAt'> & {
 }
 
 export type UpdateNoteEvent = Partial<Omit<NoteEvent, 'id' | 'createdAt'>>
+
+export type NewTechnician = Omit<Technician, 'id' | 'createdAt' | 'updatedAt'> & {
+  id?: string
+}
+
+export type UpdateTechnician = Partial<Omit<Technician, 'id' | 'createdAt'>>

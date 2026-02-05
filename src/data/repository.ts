@@ -4,11 +4,14 @@ import type {
   NewBatchTemplate,
   NewNoteEvent,
   NewProductionRun,
+  NewTechnician,
   NoteEvent,
   ProductionRun,
+  Technician,
   UpdateBatchTemplate,
   UpdateNoteEvent,
   UpdateProductionRun,
+  UpdateTechnician,
 } from './models'
 
 const nowIso = () => new Date().toISOString()
@@ -148,4 +151,38 @@ export function listNoteEvents() {
 
 export function listNoteEventsByCategory(category: NoteEvent['category']) {
   return db.noteEvents.where('category').equals(category).toArray()
+}
+
+export async function createTechnician(
+  input: NewTechnician,
+): Promise<Technician> {
+  const timestamp = nowIso()
+  const item: Technician = {
+    id: ensureId(input.id),
+    initials: input.initials,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  }
+  await db.technicians.add(item)
+  return item
+}
+
+export async function updateTechnician(
+  id: string,
+  changes: UpdateTechnician,
+): Promise<Technician | undefined> {
+  await db.technicians.update(id, { ...changes, updatedAt: nowIso() })
+  return db.technicians.get(id)
+}
+
+export function deleteTechnician(id: string) {
+  return db.technicians.delete(id)
+}
+
+export function getTechnician(id: string) {
+  return db.technicians.get(id)
+}
+
+export function listTechnicians() {
+  return db.technicians.orderBy('initials').toArray()
 }

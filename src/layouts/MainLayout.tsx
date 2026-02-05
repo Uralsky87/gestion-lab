@@ -1,6 +1,7 @@
 import { Outlet, useLocation } from 'react-router-dom'
 import Header from '../components/Header'
 import TabBar from '../components/TabBar'
+import UpdateBanner from '../components/UpdateBanner'
 import { tabs } from '../routes/tabs'
 
 export default function MainLayout() {
@@ -11,6 +12,7 @@ export default function MainLayout() {
   return (
     <div className="app-shell">
       <Header title={activeTab.label} />
+      <UpdateBanner />
       <TabBar />
       <main className="app-content">
         <Outlet />
