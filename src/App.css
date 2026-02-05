@@ -28,6 +28,24 @@
   color: var(--text-muted);
 }
 
+.update-banner {
+  margin: 12px 16px 0;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: var(--shadow-sm);
+}
+
+.update-actions {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr 1fr;
+}
+
 .app-content {
   flex: 1;
   padding: 20px 20px 88px;
@@ -121,6 +139,13 @@
   gap: 10px;
 }
 
+.date-picker-row {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
 .form-error {
   background: rgba(246, 88, 88, 0.12);
   color: #b93030;
@@ -180,6 +205,11 @@
   border-radius: 14px;
   padding: 12px;
   background: #ffffff;
+}
+
+.list-item.is-highlighted {
+  border-color: rgba(59, 110, 246, 0.6);
+  background: rgba(59, 110, 246, 0.08);
 }
 
 .list-item-title {
@@ -270,6 +300,57 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.calendar-dots {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+  margin-top: 4px;
+}
+
+.calendar-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #e9ecf4;
+  border: 1px solid var(--border);
+}
+
+.calendar-dot.status-previsto {
+  background: #3b6ef6;
+  border-color: #3b6ef6;
+}
+
+.calendar-dot.status-hecho {
+  background: #2eb67d;
+  border-color: #2eb67d;
+}
+
+.calendar-dot.status-cancelado {
+  background: #f65858;
+  border-color: #f65858;
+}
+
+.calendar-dot.status-empty {
+  background: #e9ecf4;
+  border-color: var(--border);
+}
+
+.calendar-legend {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .calendar-chip {
@@ -564,6 +645,17 @@
     justify-content: center;
     background: #ffffff;
     padding: 12px 24px;
+  }
+
+  .update-banner {
+    margin: 12px 24px 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .update-actions {
+    grid-template-columns: auto auto;
   }
 
   .form-grid {
