@@ -74,6 +74,7 @@ export default function Productions() {
   const [showForm, setShowForm] = useState(false)
   const [selectedDate, setSelectedDate] = useState(todayIso())
   const dateInputRef = useRef<HTMLInputElement | null>(null)
+  const formRef = useRef<HTMLElement | null>(null)
   const [noteDialog, setNoteDialog] = useState<{
     title: string
     notes: string[]
@@ -103,6 +104,11 @@ export default function Productions() {
   useEffect(() => {
     loadData()
   }, [])
+
+  useEffect(() => {
+    if (!showForm) return
+    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [showForm])
 
   const getTemplateName = (id: string) =>
     templates.find((template) => template.id === id)?.name ?? 'Sin plantilla'
@@ -355,7 +361,7 @@ export default function Productions() {
       </section>
 
       {showForm ? (
-        <section className="card">
+        <section className="card" ref={formRef}>
           <h3>{form.id ? 'Editar producción' : 'Nueva producción'}</h3>
         <div className="form-grid">
           <div className="form-row">

@@ -171,7 +171,19 @@ export async function updateTechnician(
   id: string,
   changes: UpdateTechnician,
 ): Promise<Technician | undefined> {
-  await db.technicians.update(id, { ...changes, updatedAt: nowIso() })
+  const existing = await db.technicians.get(id)
+  const timestamp = nowIso()
+  await db.technicians.update(id, { ...changes, updatedAt: timestamp })
+  if (
+    existing &&
+    changes.initials &&
+    existing.initials !== changes.initials
+  ) {
+    await db.productionRuns
+      .where('technician')
+      .equals(existing.initials)
+      .modify({ technician: changes.initials, updatedAt: timestamp })
+  }
   return db.technicians.get(id)
 }
 

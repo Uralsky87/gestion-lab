@@ -192,7 +192,6 @@ export default function Calendar() {
             const isSelected = selectedDate === dateKey
             const morningStatus = getShiftStatus(filteredDayRuns, 'mañana')
             const afternoonStatus = getShiftStatus(filteredDayRuns, 'tarde')
-            const hasNotes = filteredDayRuns.some((run) => run.notes?.trim())
 
             return (
               <button
@@ -206,7 +205,6 @@ export default function Calendar() {
                 onClick={() => setSelectedDate(dateKey)}
               >
                 <span className="calendar-day-number">{day.getDate()}</span>
-                {hasNotes ? <span className="note-indicator">!</span> : null}
                 <div className="calendar-dots">
                   <span className={`calendar-dot status-${morningStatus}`} />
                   <span className={`calendar-dot status-${afternoonStatus}`} />
