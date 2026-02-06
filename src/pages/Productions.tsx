@@ -74,6 +74,10 @@ export default function Productions() {
   const [showForm, setShowForm] = useState(false)
   const [selectedDate, setSelectedDate] = useState(todayIso())
   const dateInputRef = useRef<HTMLInputElement | null>(null)
+  const [noteDialog, setNoteDialog] = useState<{
+    title: string
+    notes: string[]
+  } | null>(null)
 
   const loadData = async () => {
     const [runData, templateData, techData] = await Promise.all([
@@ -102,6 +106,14 @@ export default function Productions() {
 
   const getTemplateName = (id: string) =>
     templates.find((template) => template.id === id)?.name ?? 'Sin plantilla'
+
+  const openRunNotes = (run: ProductionRun) => {
+    if (!run.notes?.trim()) return
+    setNoteDialog({
+      title: `${run.batchCode} · ${getTemplateName(run.templateId)}`,
+      notes: [run.notes.trim()],
+    })
+  }
 
   const filteredRuns = useMemo(() => {
     const weekStart = startOfWeek(new Date(`${selectedDate}T00:00:00`))
@@ -690,6 +702,17 @@ export default function Productions() {
                     {run.actualUnits != null ? (
                       <span className="tag">Real: {run.actualUnits}</span>
                     ) : null}
+                    {run.notes?.trim() ? (
+                      <button
+                        className="note-alert"
+                        type="button"
+                        onClick={() => openRunNotes(run)}
+                        aria-label="Ver notas"
+                        title="Ver notas"
+                      >
+                        !
+                      </button>
+                    ) : null}
                   </div>
                   {run.changeLog && run.changeLog.length > 0 ? (
                     <div className="history">
@@ -769,6 +792,38 @@ export default function Productions() {
           </div>
         </div>
       </section>
+
+      {noteDialog ? (
+        <div
+          className="note-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setNoteDialog(null)}
+        >
+          <div
+            className="note-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="note-modal-header">
+              <h4>{noteDialog.title}</h4>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setNoteDialog(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="note-modal-body">
+              {noteDialog.notes.map((note, index) => (
+                <p className="note-text" key={`${note}-${index}`}>
+                  {note}
+                </p>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }

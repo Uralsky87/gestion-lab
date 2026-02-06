@@ -33,6 +33,10 @@ export default function Calendar() {
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
   const [selectedDate, setSelectedDate] = useState(todayIso())
+  const [noteDialog, setNoteDialog] = useState<{
+    title: string
+    notes: string[]
+  } | null>(null)
 
   useEffect(() => {
     const loadData = async () => {
@@ -100,6 +104,31 @@ export default function Calendar() {
     return dayRuns.filter((run) => matchIds.has(run.id))
   }, [runsByDate, selectedDate, search, searchMatches])
 
+  const selectedNotes = useMemo(() => {
+    return selectedRuns
+      .filter((run) => run.notes?.trim())
+      .map((run) => ({
+        title: `${getTemplateName(run.templateId)} · ${run.shift}`,
+        note: run.notes!.trim(),
+      }))
+  }, [selectedRuns, templateMap])
+
+  const openDayNotes = () => {
+    if (selectedNotes.length === 0) return
+    setNoteDialog({
+      title: `Notas del ${selectedDate}`,
+      notes: selectedNotes.map((item) => `${item.title}: ${item.note}`),
+    })
+  }
+
+  const openRunNotes = (run: ProductionRun) => {
+    if (!run.notes?.trim()) return
+    setNoteDialog({
+      title: `${getTemplateName(run.templateId)} · ${run.shift}`,
+      notes: [run.notes.trim()],
+    })
+  }
+
   const handlePrevMonth = () => {
     setCurrentMonth(
       (prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1),
@@ -163,6 +192,7 @@ export default function Calendar() {
             const isSelected = selectedDate === dateKey
             const morningStatus = getShiftStatus(filteredDayRuns, 'mañana')
             const afternoonStatus = getShiftStatus(filteredDayRuns, 'tarde')
+            const hasNotes = filteredDayRuns.some((run) => run.notes?.trim())
 
             return (
               <button
@@ -176,6 +206,7 @@ export default function Calendar() {
                 onClick={() => setSelectedDate(dateKey)}
               >
                 <span className="calendar-day-number">{day.getDate()}</span>
+                {hasNotes ? <span className="note-indicator">!</span> : null}
                 <div className="calendar-dots">
                   <span className={`calendar-dot status-${morningStatus}`} />
                   <span className={`calendar-dot status-${afternoonStatus}`} />
@@ -201,7 +232,20 @@ export default function Calendar() {
       </section>
 
       <section className="card">
-        <h3>Detalle del día</h3>
+        <div className="card-header">
+          <h3>Detalle del día</h3>
+          {selectedNotes.length > 0 ? (
+            <button
+              className="note-alert"
+              type="button"
+              onClick={openDayNotes}
+              aria-label="Ver notas del día"
+              title="Ver notas del día"
+            >
+              !
+            </button>
+          ) : null}
+        </div>
         {selectedRuns.length === 0 ? (
           <p>No hay producciones para este día.</p>
         ) : (
@@ -217,6 +261,17 @@ export default function Calendar() {
                   </div>
                 </div>
                 <div className="list-item-actions">
+                  {run.notes?.trim() ? (
+                    <button
+                      className="note-alert"
+                      type="button"
+                      onClick={() => openRunNotes(run)}
+                      aria-label="Ver notas"
+                      title="Ver notas"
+                    >
+                      !
+                    </button>
+                  ) : null}
                   <span className={`status-badge status-${run.status}`}>
                     {run.status}
                   </span>
@@ -253,6 +308,38 @@ export default function Calendar() {
             ))}
           </div>
         </section>
+      ) : null}
+
+      {noteDialog ? (
+        <div
+          className="note-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setNoteDialog(null)}
+        >
+          <div
+            className="note-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="note-modal-header">
+              <h4>{noteDialog.title}</h4>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setNoteDialog(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="note-modal-body">
+              {noteDialog.notes.map((note, index) => (
+                <p className="note-text" key={`${note}-${index}`}>
+                  {note}
+                </p>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : null}
     </>
   )
