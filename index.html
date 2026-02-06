@@ -2,7 +2,7 @@
 <html lang="es">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/svg+xml" href="/gestion-lab/icon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#3b6ef6" />
     <meta
@@ -11,10 +11,12 @@
     />
     <title>Gestión Lab</title>
     <script>
+      const base = '/gestion-lab/'
       const params = new URLSearchParams(location.search)
       const redirect = params.get('redirect')
       if (redirect) {
-        history.replaceState(null, '', `/${redirect}`)
+        const clean = redirect.replace(/^\/+/, '')
+        history.replaceState(null, '', `${base}${clean}`)
       }
     </script>
   </head>

@@ -17,11 +17,11 @@ export default defineConfig({
         theme_color: '#3b6ef6',
         background_color: '#f6f7fb',
         display: 'standalone',
-        start_url: '/',
-        scope: '/',
+        start_url: '/gestion-lab/',
+        scope: '/gestion-lab/',
         icons: [
           {
-            src: '/icon.svg',
+            src: '/gestion-lab/icon.svg',
             sizes: 'any',
             type: 'image/svg+xml',
             purpose: 'any maskable',

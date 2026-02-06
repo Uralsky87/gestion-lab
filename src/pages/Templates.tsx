@@ -11,13 +11,26 @@ type TemplateFormState = {
   id?: string
   name: string
   tagsText: string
-  materials: MaterialItem[]
+  materials: Array<MaterialItem & { id: string }>
 }
+
+const createMaterialId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+const createMaterialRow = (material?: MaterialItem) => ({
+  id: createMaterialId(),
+  name: material?.name ?? '',
+  notes: material?.notes ?? '',
+})
 
 const emptyForm: TemplateFormState = {
   name: '',
   tagsText: '',
-  materials: [{ name: '', notes: '' }],
+  materials: [createMaterialRow()],
 }
 
 export default function Templates() {
@@ -102,8 +115,8 @@ export default function Templates() {
       tagsText: template.tags?.join(', ') ?? '',
       materials:
         template.materials.length > 0
-          ? template.materials
-          : [{ name: '', notes: '' }],
+          ? template.materials.map((material) => createMaterialRow(material))
+          : [createMaterialRow()],
     })
     setError('')
     setShowForm(true)
@@ -132,7 +145,7 @@ export default function Templates() {
   const addMaterial = () => {
     setForm((prev) => ({
       ...prev,
-      materials: [...prev.materials, { name: '', notes: '' }],
+      materials: [...prev.materials, createMaterialRow()],
     }))
   }
 
@@ -141,7 +154,7 @@ export default function Templates() {
       const updated = prev.materials.filter((_, idx) => idx !== index)
       return {
         ...prev,
-        materials: updated.length > 0 ? updated : [{ name: '', notes: '' }],
+        materials: updated.length > 0 ? updated : [createMaterialRow()],
       }
     })
   }
@@ -196,7 +209,7 @@ export default function Templates() {
             <label className="form-label">Materias primas</label>
             <div className="material-list">
               {form.materials.map((material, index) => (
-                <div className="material-row" key={`${material.name}-${index}`}>
+                <div className="material-row" key={material.id}>
                   <input
                     className="form-input"
                     placeholder="Nombre"
