@@ -100,6 +100,9 @@ export default function Productions() {
     loadData()
   }, [])
 
+  const getTemplateName = (id: string) =>
+    templates.find((template) => template.id === id)?.name ?? 'Sin plantilla'
+
   const filteredRuns = useMemo(() => {
     const weekStart = startOfWeek(new Date(`${selectedDate}T00:00:00`))
     const weekEnd = new Date(weekStart)
@@ -326,9 +329,6 @@ export default function Productions() {
       resetForm()
     }
   }
-
-  const getTemplateName = (id: string) =>
-    templates.find((template) => template.id === id)?.name ?? 'Sin plantilla'
 
   return (
     <>
