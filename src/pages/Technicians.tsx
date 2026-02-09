@@ -22,6 +22,7 @@ export default function Technicians() {
   const [runs, setRuns] = useState<ProductionRun[]>([])
   const [form, setForm] = useState<TechnicianForm>(emptyForm)
   const [error, setError] = useState('')
+  const [openStats, setOpenStats] = useState<Record<string, boolean>>({})
 
   const loadData = async () => {
     const [techData, runData] = await Promise.all([
@@ -88,6 +89,10 @@ export default function Technicians() {
     if (form.id === tech.id) {
       resetForm()
     }
+  }
+
+  const toggleStats = (id: string) => {
+    setOpenStats((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
   return (
@@ -172,18 +177,31 @@ export default function Technicians() {
                     Lotes: {item.total} · Hechos: {item.done} · Anulados:{' '}
                     {item.canceled}
                   </div>
-                  {item.runs.length > 0 ? (
-                    <div className="tech-notes">
-                      {item.runs.map((run) => (
-                        <div key={run.id} className="tech-note">
-                          <strong>{run.batchCode}</strong> · {run.date}
-                          {run.notes ? ` — ${run.notes}` : ''}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="list-item-subtitle">Sin lotes asociados.</div>
-                  )}
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    onClick={() => toggleStats(item.technician.id)}
+                  >
+                    {openStats[item.technician.id]
+                      ? 'Ocultar producciones'
+                      : 'Ver producciones'}
+                  </button>
+                  {openStats[item.technician.id] ? (
+                    item.runs.length > 0 ? (
+                      <div className="tech-notes">
+                        {item.runs.map((run) => (
+                          <div key={run.id} className="tech-note">
+                            <strong>{run.batchCode}</strong> · {run.date}
+                            {run.notes ? ` — ${run.notes}` : ''}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="list-item-subtitle">
+                        Sin lotes asociados.
+                      </div>
+                    )
+                  ) : null}
                 </div>
               </article>
             ))}

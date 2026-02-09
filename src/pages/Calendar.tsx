@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { BatchTemplate, ProductionRun } from '../data/models'
 import { listBatchTemplates, listProductionRuns } from '../data/repository'
-
-const todayIso = () => new Date().toISOString().slice(0, 10)
+import { todayLocalIso, toLocalDateKey } from '../utils/date'
 
 const getMonthLabel = (date: Date) =>
   date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
@@ -32,7 +31,7 @@ export default function Calendar() {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
-  const [selectedDate, setSelectedDate] = useState(todayIso())
+  const [selectedDate, setSelectedDate] = useState(todayLocalIso())
   const [noteDialog, setNoteDialog] = useState<{
     title: string
     notes: string[]
@@ -180,7 +179,7 @@ export default function Calendar() {
         </div>
         <div className="calendar-grid">
           {days.map((day) => {
-            const dateKey = day.toISOString().slice(0, 10)
+            const dateKey = toLocalDateKey(day)
             const isCurrentMonth = day.getMonth() === currentMonth.getMonth()
             const dayRuns = runsByDate[dateKey] ?? []
             const filteredDayRuns = search.trim()

@@ -6,6 +6,7 @@ import {
   listNoteEvents,
   updateNoteEvent,
 } from '../data/repository'
+import { todayLocalIso, toLocalDateKey } from '../utils/date'
 
 type NotesFormState = {
   id?: string
@@ -14,8 +15,6 @@ type NotesFormState = {
   body: string
   category: NoteCategory
 }
-
-const todayIso = () => new Date().toISOString().slice(0, 10)
 
 const getMonthLabel = (date: Date) =>
   date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
@@ -38,7 +37,7 @@ const getCalendarDays = (baseDate: Date) => {
 }
 
 const emptyForm: NotesFormState = {
-  date: todayIso(),
+  date: todayLocalIso(),
   title: '',
   body: '',
   category: 'propuesta',
@@ -61,7 +60,7 @@ export default function Notes() {
     const now = new Date()
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
-  const [selectedDate, setSelectedDate] = useState(todayIso())
+  const [selectedDate, setSelectedDate] = useState(todayLocalIso())
   const [form, setForm] = useState<NotesFormState>(emptyForm)
   const [error, setError] = useState('')
 
@@ -369,7 +368,7 @@ export default function Notes() {
             </div>
             <div className="calendar-grid">
               {days.map((day) => {
-                const dateKey = day.toISOString().slice(0, 10)
+                const dateKey = toLocalDateKey(day)
                 const isCurrentMonth = day.getMonth() === currentMonth.getMonth()
                 const dayNotes = notesByDate[dateKey] ?? []
                 const isSelected = selectedDate === dateKey

@@ -1,5 +1,6 @@
 import { useRef, useState } from 'react'
 import { exportBackup, importBackup, validateBackup } from '../data/backup'
+import { toLocalDateKey } from '../utils/date'
 
 export default function Settings() {
   const fileInputRef = useRef<HTMLInputElement | null>(null)
@@ -20,9 +21,7 @@ export default function Settings() {
       const url = URL.createObjectURL(blob)
       const link = document.createElement('a')
       link.href = url
-      link.download = `gestion-lab-backup-${new Date()
-        .toISOString()
-        .slice(0, 10)}.json`
+      link.download = `gestion-lab-backup-${toLocalDateKey(new Date())}.json`
       link.click()
       URL.revokeObjectURL(url)
       setStatus('Backup exportado correctamente.')

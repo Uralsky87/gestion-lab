@@ -15,6 +15,7 @@ import {
   listTechnicians,
   updateProductionRun,
 } from '../data/repository'
+import { todayLocalIso } from '../utils/date'
 
 type ProductionFormState = {
   id?: string
@@ -33,10 +34,8 @@ type ProductionFormState = {
   replacementText: string
 }
 
-const todayIso = () => new Date().toISOString().slice(0, 10)
-
 const emptyForm = (templateId = ''): ProductionFormState => ({
-  date: todayIso(),
+  date: todayLocalIso(),
   shift: 'mañana',
   batchCode: '',
   templateId,
@@ -72,7 +71,7 @@ export default function Productions() {
   const [form, setForm] = useState<ProductionFormState>(emptyForm())
   const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
-  const [selectedDate, setSelectedDate] = useState(todayIso())
+  const [selectedDate, setSelectedDate] = useState(todayLocalIso())
   const dateInputRef = useRef<HTMLInputElement | null>(null)
   const formRef = useRef<HTMLElement | null>(null)
   const [noteDialog, setNoteDialog] = useState<{

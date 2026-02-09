@@ -39,6 +39,7 @@ export default function Templates() {
   const [form, setForm] = useState<TemplateFormState>(emptyForm)
   const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
 
   const loadTemplates = async () => {
     const data = await listBatchTemplates()
@@ -51,14 +52,19 @@ export default function Templates() {
 
   const filteredTemplates = useMemo(() => {
     const query = search.trim().toLowerCase()
-    if (!query) return templates
-    return templates.filter((template) => {
-      const nameMatch = template.name.toLowerCase().includes(query)
-      const materialMatch = template.materials.some((material) =>
-        material.name.toLowerCase().includes(query),
-      )
-      return nameMatch || materialMatch
-    })
+    const result = query
+      ? templates.filter((template) => {
+          const nameMatch = template.name.toLowerCase().includes(query)
+          const materialMatch = template.materials.some((material) =>
+            material.name.toLowerCase().includes(query),
+          )
+          return nameMatch || materialMatch
+        })
+      : templates
+
+    return [...result].sort((a, b) =>
+      a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }),
+    )
   }, [search, templates])
 
   const resetForm = () => {
@@ -279,48 +285,61 @@ export default function Templates() {
       </section>
 
       <section className="card">
-        <h3>Lotes guardados</h3>
-        {filteredTemplates.length === 0 ? (
-          <p>No hay lotes que mostrar.</p>
-        ) : (
-          <div className="list">
-            {filteredTemplates.map((template) => (
-              <article key={template.id} className="list-item">
-                <div className="list-item-main">
-                  <div className="list-item-title">{template.name}</div>
-                  <div className="list-item-subtitle">
-                    {template.materials.map((material) => material.name).join(', ')}
-                  </div>
-                  {template.tags && template.tags.length > 0 ? (
-                    <div className="tag-row">
-                      {template.tags.map((tag) => (
-                        <span className="tag" key={tag}>
-                          {tag}
-                        </span>
-                      ))}
+        <div className="card-header">
+          <h3>Lotes guardados</h3>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => setShowSaved((prev) => !prev)}
+          >
+            {showSaved ? 'Cerrar' : 'Ver'}
+          </button>
+        </div>
+        {showSaved ? (
+          filteredTemplates.length === 0 ? (
+            <p>No hay lotes que mostrar.</p>
+          ) : (
+            <div className="list">
+              {filteredTemplates.map((template) => (
+                <article key={template.id} className="list-item">
+                  <div className="list-item-main">
+                    <div className="list-item-title">{template.name}</div>
+                    <div className="list-item-subtitle">
+                      {template.materials
+                        .map((material) => material.name)
+                        .join(', ')}
                     </div>
-                  ) : null}
-                </div>
-                <div className="list-item-actions">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => handleEdit(template)}
-                  >
-                    Editar
-                  </button>
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => handleDelete(template)}
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
+                    {template.tags && template.tags.length > 0 ? (
+                      <div className="tag-row">
+                        {template.tags.map((tag) => (
+                          <span className="tag" key={tag}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="list-item-actions">
+                    <button
+                      className="secondary-button"
+                      type="button"
+                      onClick={() => handleEdit(template)}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="ghost-button"
+                      type="button"
+                      onClick={() => handleDelete(template)}
+                    >
+                      Eliminar
+                    </button>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )
+        ) : null}
       </section>
     </>
   )
