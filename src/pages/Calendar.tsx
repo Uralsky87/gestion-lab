@@ -191,6 +191,12 @@ export default function Calendar() {
             const isSelected = selectedDate === dateKey
             const morningStatus = getShiftStatus(filteredDayRuns, 'mañana')
             const afternoonStatus = getShiftStatus(filteredDayRuns, 'tarde')
+            const morningHasNotes = filteredDayRuns.some(
+              (run) => run.shift === 'mañana' && run.notes?.trim(),
+            )
+            const afternoonHasNotes = filteredDayRuns.some(
+              (run) => run.shift === 'tarde' && run.notes?.trim(),
+            )
 
             return (
               <button
@@ -205,8 +211,22 @@ export default function Calendar() {
               >
                 <span className="calendar-day-number">{day.getDate()}</span>
                 <div className="calendar-dots">
-                  <span className={`calendar-dot status-${morningStatus}`} />
-                  <span className={`calendar-dot status-${afternoonStatus}`} />
+                  <div className="calendar-shift-row">
+                    <span className={`calendar-dot status-${morningStatus}`} />
+                    {morningHasNotes ? (
+                      <span className="calendar-note-dot" aria-hidden="true">
+                        !
+                      </span>
+                    ) : null}
+                  </div>
+                  <div className="calendar-shift-row">
+                    <span className={`calendar-dot status-${afternoonStatus}`} />
+                    {afternoonHasNotes ? (
+                      <span className="calendar-note-dot" aria-hidden="true">
+                        !
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               </button>
             )
