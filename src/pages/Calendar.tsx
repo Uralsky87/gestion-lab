@@ -103,15 +103,6 @@ export default function Calendar() {
     return dayRuns.filter((run) => matchIds.has(run.id))
   }, [runsByDate, selectedDate, search, searchMatches])
 
-  const selectedNotes = useMemo(() => {
-    return selectedRuns
-      .filter((run) => run.notes?.trim())
-      .map((run) => ({
-        title: `${getTemplateName(run.templateId)} · ${run.shift}`,
-        note: run.notes!.trim(),
-      }))
-  }, [selectedRuns, templateMap])
-
   const openRunNotes = (run: ProductionRun) => {
     if (!run.notes?.trim()) return
     setNoteDialog({
