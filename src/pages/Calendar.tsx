@@ -112,14 +112,6 @@ export default function Calendar() {
       }))
   }, [selectedRuns, templateMap])
 
-  const openDayNotes = () => {
-    if (selectedNotes.length === 0) return
-    setNoteDialog({
-      title: `Notas del ${selectedDate}`,
-      notes: selectedNotes.map((item) => `${item.title}: ${item.note}`),
-    })
-  }
-
   const openRunNotes = (run: ProductionRun) => {
     if (!run.notes?.trim()) return
     setNoteDialog({
