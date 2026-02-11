@@ -104,6 +104,36 @@
   gap: 12px;
 }
 
+.card-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border: 1px solid var(--border);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+.icon-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.small-button {
+  width: auto;
+  padding: 8px 12px;
+  font-size: 12px;
+}
+
 .card p {
   margin: 0;
   color: var(--text-muted);

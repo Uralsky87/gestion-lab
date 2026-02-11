@@ -23,6 +23,8 @@ export default function Technicians() {
   const [form, setForm] = useState<TechnicianForm>(emptyForm)
   const [error, setError] = useState('')
   const [openStats, setOpenStats] = useState<Record<string, boolean>>({})
+  const [isFormOpen, setIsFormOpen] = useState(false)
+  const [isListOpen, setIsListOpen] = useState(true)
 
   const loadData = async () => {
     const [techData, runData] = await Promise.all([
@@ -55,6 +57,7 @@ export default function Technicians() {
   const resetForm = () => {
     setForm(emptyForm)
     setError('')
+    setIsFormOpen(false)
   }
 
   const handleSave = async () => {
@@ -77,6 +80,7 @@ export default function Technicians() {
   const handleEdit = (tech: Technician) => {
     setForm({ id: tech.id, initials: tech.initials })
     setError('')
+    setIsFormOpen(true)
   }
 
   const handleDelete = async (tech: Technician) => {
@@ -95,70 +99,149 @@ export default function Technicians() {
     setOpenStats((prev) => ({ ...prev, [id]: !prev[id] }))
   }
 
+  const toggleForm = () => {
+    setIsFormOpen((prev) => {
+      const next = !prev
+      if (next) {
+        setForm(emptyForm)
+        setError('')
+      }
+      return next
+    })
+  }
+
+  const toggleList = () => {
+    setIsListOpen((prev) => !prev)
+  }
+
   return (
     <>
       <section className="card">
-        <h3>{form.id ? 'Editar técnico' : 'Nuevo técnico'}</h3>
-        <div className="form-row">
-          <label className="form-label" htmlFor="technicianInitials">
-            Iniciales
-          </label>
-          <input
-            id="technicianInitials"
-            className="form-input"
-            value={form.initials}
-            onChange={(event) =>
-              setForm((prev) => ({
-                ...prev,
-                initials: event.target.value.toUpperCase(),
-              }))
-            }
-            placeholder="AM"
-            maxLength={6}
-          />
-        </div>
-        {error ? <div className="form-error">{error}</div> : null}
-        <div className="form-actions">
-          <button className="primary-button" type="button" onClick={handleSave}>
-            {form.id ? 'Guardar cambios' : 'Guardar técnico'}
+        <div className="card-header">
+          <h3>{form.id ? 'Editar técnico' : 'Nuevo técnico'}</h3>
+          <button
+            className="icon-button add-tech-button"
+            type="button"
+            onClick={toggleForm}
+            aria-label="Añadir técnico"
+            aria-expanded={isFormOpen}
+            aria-controls="technician-form"
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="9" cy="7" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+              <path
+                d="M3.5 18.2c1.8-3 8.2-3 10 0"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+              <path
+                d="M17 9.5v6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+              <path
+                d="M14 12.5h6"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
           </button>
-          <button className="ghost-button" type="button" onClick={resetForm}>
-            Cancelar
-          </button>
         </div>
+        {isFormOpen ? (
+          <div id="technician-form" className="form-grid">
+            <div className="form-row">
+              <label className="form-label" htmlFor="technicianInitials">
+                Iniciales
+              </label>
+              <input
+                id="technicianInitials"
+                className="form-input"
+                value={form.initials}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    initials: event.target.value.toUpperCase(),
+                  }))
+                }
+                placeholder="AM"
+                maxLength={6}
+              />
+            </div>
+            {error ? <div className="form-error">{error}</div> : null}
+            <div className="form-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={handleSave}
+              >
+                {form.id ? 'Guardar cambios' : 'Guardar técnico'}
+              </button>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={resetForm}
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       <section className="card">
-        <h3>Listado</h3>
-        {technicians.length === 0 ? (
-          <p>No hay técnicos registrados.</p>
-        ) : (
-          <div className="list">
-            {technicians.map((tech) => (
-              <article key={tech.id} className="list-item">
-                <div className="list-item-main">
-                  <div className="list-item-title">{tech.initials}</div>
-                </div>
-                <div className="list-item-actions">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => handleEdit(tech)}
-                  >
-                    Editar
-                  </button>
-                  <button
-                    className="ghost-button"
-                    type="button"
-                    onClick={() => handleDelete(tech)}
-                  >
-                    Eliminar
-                  </button>
-                </div>
-              </article>
-            ))}
+        <div className="card-header">
+          <h3>Listado</h3>
+          <div className="card-header-actions">
+            <button
+              className="ghost-button small-button"
+              type="button"
+              onClick={toggleList}
+              aria-expanded={isListOpen}
+              aria-controls="technician-list"
+            >
+              {isListOpen ? 'Ocultar' : 'Mostrar'}
+            </button>
           </div>
-        )}
+        </div>
+        {isListOpen ? (
+          <div id="technician-list">
+            {technicians.length === 0 ? (
+              <p>No hay técnicos registrados.</p>
+            ) : (
+              <div className="list">
+                {technicians.map((tech) => (
+                  <article key={tech.id} className="list-item">
+                    <div className="list-item-main">
+                      <div className="list-item-title">{tech.initials}</div>
+                    </div>
+                    <div className="list-item-actions">
+                      <button
+                        className="secondary-button"
+                        type="button"
+                        onClick={() => handleEdit(tech)}
+                      >
+                        Editar
+                      </button>
+                      <button
+                        className="ghost-button"
+                        type="button"
+                        onClick={() => handleDelete(tech)}
+                      >
+                        Eliminar
+                      </button>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+          </div>
+        ) : null}
       </section>
 
       <section className="card">
