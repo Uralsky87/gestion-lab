@@ -61,6 +61,9 @@ const startOfWeek = (date: Date) => {
 
 const toDateOnly = (value: string) => new Date(`${value}T00:00:00`)
 
+const sortTemplatesByName = (a: BatchTemplate, b: BatchTemplate) =>
+  a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
+
 export default function Productions() {
   const [runs, setRuns] = useState<ProductionRun[]>([])
   const [templates, setTemplates] = useState<BatchTemplate[]>([])
@@ -74,6 +77,7 @@ export default function Productions() {
   const [selectedDate, setSelectedDate] = useState(todayLocalIso())
   const dateInputRef = useRef<HTMLInputElement | null>(null)
   const formRef = useRef<HTMLElement | null>(null)
+  const [isTotalStatsOpen, setIsTotalStatsOpen] = useState(false)
   const [noteDialog, setNoteDialog] = useState<{
     title: string
     notes: string[]
@@ -85,14 +89,16 @@ export default function Productions() {
       listBatchTemplates(),
       listTechnicians(),
     ])
+    const sortedTemplates = [...templateData].sort(sortTemplatesByName)
     setRuns(runData)
-    setTemplates(templateData)
+    setTemplates(sortedTemplates)
     setTechnicians(techData)
-    if (!form.templateId && templateData.length > 0) {
+    if (!form.templateId && sortedTemplates.length > 0) {
       setForm((prev) => ({
         ...prev,
-        templateId: templateData[0].id,
-        replacementTemplateId: prev.replacementTemplateId || templateData[0].id,
+        templateId: sortedTemplates[0].id,
+        replacementTemplateId:
+          prev.replacementTemplateId || sortedTemplates[0].id,
       }))
     }
     if (!form.technician && techData.length > 0) {
@@ -192,6 +198,38 @@ export default function Productions() {
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5)
+  }, [runs, templates])
+
+  const totalStats = useMemo(() => {
+    const byTechnician = runs.reduce<Record<string, number>>((acc, run) => {
+      const key = run.technician || 'Sin técnico'
+      acc[key] = (acc[key] ?? 0) + 1
+      return acc
+    }, {})
+
+    const byShift = runs.reduce<Record<string, number>>((acc, run) => {
+      acc[run.shift] = (acc[run.shift] ?? 0) + 1
+      return acc
+    }, {})
+
+    const templateCounts = runs.reduce<Record<string, number>>((acc, run) => {
+      acc[run.templateId] = (acc[run.templateId] ?? 0) + 1
+      return acc
+    }, {})
+
+    const templatesRanking = templates
+      .map((template) => ({
+        templateId: template.id,
+        count: templateCounts[template.id] ?? 0,
+        name: template.name,
+      }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'es', { sensitivity: 'base' }))
+
+    return {
+      byTechnician: Object.entries(byTechnician).sort((a, b) => b[1] - a[1]),
+      byShift: Object.entries(byShift).sort((a, b) => b[1] - a[1]),
+      templates: templatesRanking,
+    }
   }, [runs, templates])
 
   const resetForm = () => {
@@ -796,6 +834,72 @@ export default function Productions() {
             )}
           </div>
         </div>
+      </section>
+
+      <section className="card">
+        <div className="card-header">
+          <h3>Estadísticas totales</h3>
+          <div className="card-header-actions">
+            <button
+              className="ghost-button small-button"
+              type="button"
+              onClick={() => setIsTotalStatsOpen((prev) => !prev)}
+              aria-expanded={isTotalStatsOpen}
+              aria-controls="total-stats"
+            >
+              {isTotalStatsOpen ? 'Ocultar' : 'Mostrar'}
+            </button>
+          </div>
+        </div>
+        {isTotalStatsOpen ? (
+          <div id="total-stats" className="stats-grid">
+            <div className="stats-card">
+              <div className="stats-title">Por técnico (total)</div>
+              {totalStats.byTechnician.length === 0 ? (
+                <p>Sin datos.</p>
+              ) : (
+                <ul className="stats-list">
+                  {totalStats.byTechnician.map(([tech, count]) => (
+                    <li key={tech}>
+                      <span>{tech}</span>
+                      <strong>{count}</strong>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="stats-card">
+              <div className="stats-title">Por turno (total)</div>
+              {totalStats.byShift.length === 0 ? (
+                <p>Sin datos.</p>
+              ) : (
+                <ul className="stats-list">
+                  {totalStats.byShift.map(([shift, count]) => (
+                    <li key={shift}>
+                      <span>{shift}</span>
+                      <strong>{count}</strong>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            <div className="stats-card">
+              <div className="stats-title">Plantillas (total)</div>
+              {totalStats.templates.length === 0 ? (
+                <p>Sin datos.</p>
+              ) : (
+                <ul className="stats-list">
+                  {totalStats.templates.map((item) => (
+                    <li key={item.templateId}>
+                      <span>{item.name}</span>
+                      <strong>{item.count}</strong>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {noteDialog ? (

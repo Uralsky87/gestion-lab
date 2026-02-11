@@ -251,17 +251,6 @@ export default function Calendar() {
       <section className="card">
         <div className="card-header">
           <h3>Detalle del día</h3>
-          {selectedNotes.length > 0 ? (
-            <button
-              className="note-alert"
-              type="button"
-              onClick={openDayNotes}
-              aria-label="Ver notas del día"
-              title="Ver notas del día"
-            >
-              !
-            </button>
-          ) : null}
         </div>
         {selectedRuns.length === 0 ? (
           <p>No hay producciones para este día.</p>

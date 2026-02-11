@@ -279,7 +279,13 @@ export default function Templates() {
             type="search"
             placeholder="Nombre o materia prima"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              const nextValue = event.target.value
+              setSearch(nextValue)
+              if (nextValue.trim() && !showSaved) {
+                setShowSaved(true)
+              }
+            }}
           />
         </div>
       </section>

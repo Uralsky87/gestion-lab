@@ -24,7 +24,7 @@ export default function Technicians() {
   const [error, setError] = useState('')
   const [openStats, setOpenStats] = useState<Record<string, boolean>>({})
   const [isFormOpen, setIsFormOpen] = useState(false)
-  const [isListOpen, setIsListOpen] = useState(true)
+  const [isListOpen, setIsListOpen] = useState(false)
 
   const loadData = async () => {
     const [techData, runData] = await Promise.all([
@@ -196,7 +196,7 @@ export default function Technicians() {
 
       <section className="card">
         <div className="card-header">
-          <h3>Listado</h3>
+          <h3>Listado de técnicos</h3>
           <div className="card-header-actions">
             <button
               className="ghost-button small-button"
