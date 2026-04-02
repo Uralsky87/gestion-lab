@@ -67,6 +67,7 @@ export async function createProductionRun(
     actualUnits: input.actualUnits,
     technician: input.technician,
     notes: input.notes,
+    incidents: input.incidents,
     status: input.status,
     changeLog: input.changeLog,
     createdAt: timestamp,

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import type { ProductionRun, Technician } from '../data/models'
+import { useNavigate } from 'react-router-dom'
+import type { BatchTemplate, ProductionRun, Technician } from '../data/models'
 import {
   createTechnician,
   deleteTechnician,
+  listBatchTemplates,
   listProductionRuns,
   listTechnicians,
   updateTechnician,
@@ -18,8 +20,10 @@ const emptyForm: TechnicianForm = {
 }
 
 export default function Technicians() {
+  const navigate = useNavigate()
   const [technicians, setTechnicians] = useState<Technician[]>([])
   const [runs, setRuns] = useState<ProductionRun[]>([])
+  const [templates, setTemplates] = useState<BatchTemplate[]>([])
   const [form, setForm] = useState<TechnicianForm>(emptyForm)
   const [error, setError] = useState('')
   const [openStats, setOpenStats] = useState<Record<string, boolean>>({})
@@ -27,17 +31,27 @@ export default function Technicians() {
   const [isListOpen, setIsListOpen] = useState(false)
 
   const loadData = async () => {
-    const [techData, runData] = await Promise.all([
+    const [techData, runData, templateData] = await Promise.all([
       listTechnicians(),
       listProductionRuns(),
+      listBatchTemplates(),
     ])
     setTechnicians(techData)
     setRuns(runData)
+    setTemplates(templateData)
   }
 
   useEffect(() => {
     loadData()
   }, [])
+
+  const templateMap = useMemo(
+    () => new Map(templates.map((template) => [template.id, template.name])),
+    [templates],
+  )
+
+  const getTemplateName = (templateId: string) =>
+    templateMap.get(templateId) ?? 'Sin lote'
 
   const stats = useMemo(() => {
     return technicians.map((tech) => {
@@ -112,6 +126,17 @@ export default function Technicians() {
 
   const toggleList = () => {
     setIsListOpen((prev) => !prev)
+  }
+
+  const handleOpenProduction = (run: ProductionRun) => {
+    const confirmed = window.confirm(
+      `¿Ir a Producciones para ver la fecha ${run.date}?`,
+    )
+    if (!confirmed) return
+
+    navigate('/producciones', {
+      state: { selectedDate: run.date },
+    })
   }
 
   return (
@@ -273,10 +298,16 @@ export default function Technicians() {
                     item.runs.length > 0 ? (
                       <div className="tech-notes">
                         {item.runs.map((run) => (
-                          <div key={run.id} className="tech-note">
-                            <strong>{run.batchCode}</strong> · {run.date}
+                          <button
+                            key={run.id}
+                            className="calendar-note-chip tech-note-link"
+                            type="button"
+                            onClick={() => handleOpenProduction(run)}
+                          >
+                            <strong>{run.batchCode}</strong> · {run.date} ·{' '}
+                            {getTemplateName(run.templateId)}
                             {run.notes ? ` — ${run.notes}` : ''}
-                          </div>
+                          </button>
                         ))}
                       </div>
                     ) : (

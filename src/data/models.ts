@@ -31,6 +31,7 @@ export type ProductionRun = {
   actualUnits?: number
   technician: string
   notes?: string
+  incidents?: string
   status: ProductionStatus
   changeLog?: ChangeLogEntry[]
   createdAt: string

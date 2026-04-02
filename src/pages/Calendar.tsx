@@ -1,7 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { BatchTemplate, ProductionRun } from '../data/models'
-import { listBatchTemplates, listProductionRuns } from '../data/repository'
+import {
+  deleteProductionRun,
+  listBatchTemplates,
+  listProductionRuns,
+  updateProductionRun,
+} from '../data/repository'
 import { todayLocalIso, toLocalDateKey } from '../utils/date'
+
+type RunDetailKind = 'notes' | 'incidents'
+
+type RunDetailDialog = {
+  title: string
+  content: string[]
+  kind: RunDetailKind
+}
 
 const getMonthLabel = (date: Date) =>
   date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
@@ -32,22 +45,21 @@ export default function Calendar() {
     return new Date(now.getFullYear(), now.getMonth(), 1)
   })
   const [selectedDate, setSelectedDate] = useState(todayLocalIso())
-  const [noteDialog, setNoteDialog] = useState<{
-    title: string
-    notes: string[]
-  } | null>(null)
+  const [noteDialog, setNoteDialog] = useState<RunDetailDialog | null>(null)
+  const [statusMenuRunId, setStatusMenuRunId] = useState<string | null>(null)
+  const [busyRunId, setBusyRunId] = useState<string | null>(null)
+
+  const loadData = async () => {
+    const [runData, templateData] = await Promise.all([
+      listProductionRuns(),
+      listBatchTemplates(),
+    ])
+    setRuns(runData)
+    setTemplates(templateData)
+  }
 
   useEffect(() => {
-    const loadData = async () => {
-      const [runData, templateData] = await Promise.all([
-        listProductionRuns(),
-        listBatchTemplates(),
-      ])
-      setRuns(runData)
-      setTemplates(templateData)
-    }
-
-    loadData()
+    void loadData()
   }, [])
 
   const templateMap = useMemo(() => {
@@ -55,6 +67,10 @@ export default function Calendar() {
   }, [templates])
 
   const getTemplateName = (id: string) => templateMap.get(id) ?? 'Sin plantilla'
+
+  const hasRunNotes = (run: ProductionRun) => Boolean(run.notes?.trim())
+
+  const hasRunIncidents = (run: ProductionRun) => Boolean(run.incidents?.trim())
 
   const runsByDate = useMemo(() => {
     return runs.reduce<Record<string, ProductionRun[]>>((acc, run) => {
@@ -103,12 +119,46 @@ export default function Calendar() {
     return dayRuns.filter((run) => matchIds.has(run.id))
   }, [runsByDate, selectedDate, search, searchMatches])
 
-  const openRunNotes = (run: ProductionRun) => {
-    if (!run.notes?.trim()) return
+  const openRunDetail = (run: ProductionRun, kind: RunDetailKind) => {
+    const content = kind === 'incidents' ? run.incidents?.trim() : run.notes?.trim()
+    if (!content) return
     setNoteDialog({
       title: `${getTemplateName(run.templateId)} · ${run.shift}`,
-      notes: [run.notes.trim()],
+      content: [content],
+      kind,
     })
+  }
+
+  const handleStatusChange = async (
+    run: ProductionRun,
+    nextStatus: 'previsto' | 'hecho' | 'cancelado',
+  ) => {
+    setBusyRunId(run.id)
+    try {
+      await updateProductionRun(run.id, { status: nextStatus })
+      await loadData()
+      setStatusMenuRunId(null)
+    } finally {
+      setBusyRunId(null)
+    }
+  }
+
+  const handleDeleteRun = async (run: ProductionRun) => {
+    const confirmed = window.confirm(
+      `¿Eliminar la producción ${run.batchCode} del ${run.date} (${run.shift})?`,
+    )
+    if (!confirmed) return
+
+    setBusyRunId(run.id)
+    try {
+      await deleteProductionRun(run.id)
+      await loadData()
+      setStatusMenuRunId((currentId) =>
+        currentId === run.id ? null : currentId,
+      )
+    } finally {
+      setBusyRunId(null)
+    }
   }
 
   const handlePrevMonth = () => {
@@ -174,11 +224,11 @@ export default function Calendar() {
             const isSelected = selectedDate === dateKey
             const morningStatus = getShiftStatus(filteredDayRuns, 'mañana')
             const afternoonStatus = getShiftStatus(filteredDayRuns, 'tarde')
-            const morningHasNotes = filteredDayRuns.some(
-              (run) => run.shift === 'mañana' && run.notes?.trim(),
+            const morningHasIncidents = filteredDayRuns.some(
+              (run) => run.shift === 'mañana' && run.incidents?.trim(),
             )
-            const afternoonHasNotes = filteredDayRuns.some(
-              (run) => run.shift === 'tarde' && run.notes?.trim(),
+            const afternoonHasIncidents = filteredDayRuns.some(
+              (run) => run.shift === 'tarde' && run.incidents?.trim(),
             )
 
             return (
@@ -196,7 +246,7 @@ export default function Calendar() {
                 <div className="calendar-dots">
                   <div className="calendar-shift-row">
                     <span className={`calendar-dot status-${morningStatus}`} />
-                    {morningHasNotes ? (
+                    {morningHasIncidents ? (
                       <span className="calendar-note-dot" aria-hidden="true">
                         !
                       </span>
@@ -204,7 +254,7 @@ export default function Calendar() {
                   </div>
                   <div className="calendar-shift-row">
                     <span className={`calendar-dot status-${afternoonStatus}`} />
-                    {afternoonHasNotes ? (
+                    {afternoonHasIncidents ? (
                       <span className="calendar-note-dot" aria-hidden="true">
                         !
                       </span>
@@ -248,22 +298,73 @@ export default function Calendar() {
                   <div className="list-item-subtitle">
                     {run.batchCode} · {run.technician}
                   </div>
+                  <div className="tag-row">
+                    {hasRunIncidents(run) ? (
+                      <button
+                        className="note-alert note-alert-incident"
+                        type="button"
+                        onClick={() => openRunDetail(run, 'incidents')}
+                        aria-label="Ver incidentes"
+                        title="Ver incidentes"
+                      >
+                        !
+                      </button>
+                    ) : null}
+                    {hasRunNotes(run) ? (
+                      <button
+                        className="note-alert note-alert-note"
+                        type="button"
+                        onClick={() => openRunDetail(run, 'notes')}
+                        aria-label="Ver notas"
+                        title="Ver notas"
+                      >
+                        !
+                      </button>
+                    ) : null}
+                    <span className={`status-badge status-${run.status}`}>
+                      {run.status}
+                    </span>
+                  </div>
                 </div>
-                <div className="list-item-actions">
-                  {run.notes?.trim() ? (
+                <div className="list-item-actions calendar-run-actions">
+                  <div className="calendar-status-editor">
                     <button
-                      className="note-alert"
+                      className="secondary-button"
                       type="button"
-                      onClick={() => openRunNotes(run)}
-                      aria-label="Ver notas"
-                      title="Ver notas"
+                      disabled={busyRunId === run.id}
+                      onClick={() =>
+                        setStatusMenuRunId((currentId) =>
+                          currentId === run.id ? null : run.id,
+                        )
+                      }
                     >
-                      !
+                      Modificar estado
                     </button>
-                  ) : null}
-                  <span className={`status-badge status-${run.status}`}>
-                    {run.status}
-                  </span>
+                    {statusMenuRunId === run.id ? (
+                      <select
+                        className="form-input"
+                        value={run.status === 'cambiado' ? 'previsto' : run.status}
+                        onChange={(event) =>
+                          void handleStatusChange(
+                            run,
+                            event.target.value as 'previsto' | 'hecho' | 'cancelado',
+                          )
+                        }
+                      >
+                        <option value="previsto">Pendiente</option>
+                        <option value="hecho">Hecho</option>
+                        <option value="cancelado">Anulado</option>
+                      </select>
+                    ) : null}
+                  </div>
+                  <button
+                    className="ghost-button"
+                    type="button"
+                    disabled={busyRunId === run.id}
+                    onClick={() => void handleDeleteRun(run)}
+                  >
+                    Eliminar
+                  </button>
                 </div>
               </article>
             ))}
@@ -311,7 +412,10 @@ export default function Calendar() {
             onClick={(event) => event.stopPropagation()}
           >
             <div className="note-modal-header">
-              <h4>{noteDialog.title}</h4>
+              <h4>
+                {noteDialog.kind === 'incidents' ? 'Incidentes' : 'Notas'} ·{' '}
+                {noteDialog.title}
+              </h4>
               <button
                 className="ghost-button"
                 type="button"
@@ -321,7 +425,7 @@ export default function Calendar() {
               </button>
             </div>
             <div className="note-modal-body">
-              {noteDialog.notes.map((note, index) => (
+              {noteDialog.content.map((note, index) => (
                 <p className="note-text" key={`${note}-${index}`}>
                   {note}
                 </p>

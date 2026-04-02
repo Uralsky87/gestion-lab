@@ -86,10 +86,6 @@ export default function Templates() {
       setError('El nombre es obligatorio.')
       return
     }
-    if (materials.length === 0) {
-      setError('Agrega al menos una materia prima.')
-      return
-    }
 
     const tags = form.tagsText
       .split(',')
@@ -192,7 +188,7 @@ export default function Templates() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, name: event.target.value }))
                 }
-                placeholder="Ej: Lote pan artesanal"
+                placeholder="Nombre del lote"
               />
             </div>
             <div className="form-row">
@@ -206,7 +202,7 @@ export default function Templates() {
                 onChange={(event) =>
                   setForm((prev) => ({ ...prev, tagsText: event.target.value }))
                 }
-                placeholder="pan, diario"
+                placeholder="Acondicionamiento"
               />
             </div>
           </div>
