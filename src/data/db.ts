@@ -1,5 +1,12 @@
 import Dexie from 'dexie'
-import type { BatchTemplate, NoteEvent, ProductionRun, Technician } from './models'
+import {
+  normalizeProductionShift,
+  normalizeProductionStatus,
+  type BatchTemplate,
+  type NoteEvent,
+  type ProductionRun,
+  type Technician,
+} from './models'
 
 export class GestionLabDB extends Dexie {
   batchTemplates!: Dexie.Table<BatchTemplate, string>
@@ -24,6 +31,41 @@ export class GestionLabDB extends Dexie {
       noteEvents: '&id, date, category, createdAt, updatedAt',
       technicians: '&id, initials, createdAt, updatedAt',
     })
+
+    this.version(3)
+      .stores({
+        batchTemplates: '&id, name, *tags, createdAt, updatedAt',
+        productionRuns:
+          '&id, date, shift, batchCode, templateId, technician, status, createdAt, updatedAt',
+        noteEvents: '&id, date, category, createdAt, updatedAt',
+        technicians: '&id, initials, createdAt, updatedAt',
+      })
+      .upgrade((tx) =>
+        tx
+          .table('productionRuns')
+          .toCollection()
+          .modify((run) => {
+            run.status = normalizeProductionStatus(run.status)
+          }),
+      )
+
+    this.version(4)
+      .stores({
+        batchTemplates: '&id, name, *tags, createdAt, updatedAt',
+        productionRuns:
+          '&id, date, shift, batchCode, templateId, technician, status, createdAt, updatedAt',
+        noteEvents: '&id, date, category, createdAt, updatedAt',
+        technicians: '&id, initials, createdAt, updatedAt',
+      })
+      .upgrade((tx) =>
+        tx
+          .table('productionRuns')
+          .toCollection()
+          .modify((run) => {
+            run.shift = normalizeProductionShift(run.shift)
+            run.status = normalizeProductionStatus(run.status)
+          }),
+      )
   }
 }
 

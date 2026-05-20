@@ -30,7 +30,7 @@ const createMaterialRow = (material?: MaterialItem) => ({
 const emptyForm: TemplateFormState = {
   name: '',
   tagsText: '',
-  materials: [createMaterialRow()],
+  materials: [],
 }
 
 export default function Templates() {
@@ -156,7 +156,7 @@ export default function Templates() {
       const updated = prev.materials.filter((_, idx) => idx !== index)
       return {
         ...prev,
-        materials: updated.length > 0 ? updated : [createMaterialRow()],
+        materials: updated,
       }
     })
   }
@@ -208,7 +208,7 @@ export default function Templates() {
           </div>
 
           <div className="form-row">
-            <label className="form-label">Materias primas</label>
+            <label className="form-label">Materias primas (opcional)</label>
             <div className="material-list">
               {form.materials.map((material, index) => (
                 <div className="material-row" key={material.id}>
@@ -307,9 +307,11 @@ export default function Templates() {
                   <div className="list-item-main">
                     <div className="list-item-title">{template.name}</div>
                     <div className="list-item-subtitle">
-                      {template.materials
-                        .map((material) => material.name)
-                        .join(', ')}
+                      {template.materials.length > 0
+                        ? template.materials
+                            .map((material) => material.name)
+                            .join(', ')
+                        : 'Sin materias primas añadidas'}
                     </div>
                     {template.tags && template.tags.length > 0 ? (
                       <div className="tag-row">

@@ -56,8 +56,8 @@ export default function Technicians() {
   const stats = useMemo(() => {
     return technicians.map((tech) => {
       const techRuns = runs.filter((run) => run.technician === tech.initials)
-      const done = techRuns.filter((run) => run.status === 'hecho').length
-      const canceled = techRuns.filter((run) => run.status === 'cancelado').length
+      const done = techRuns.filter((run) => run.status === 'completada').length
+      const canceled = techRuns.filter((run) => run.status === 'cancelada').length
       return {
         technician: tech,
         total: techRuns.length,
@@ -282,7 +282,7 @@ export default function Technicians() {
                     {item.technician.initials}
                   </div>
                   <div className="list-item-subtitle">
-                    Lotes: {item.total} · Hechos: {item.done} · Anulados:{' '}
+                    Lotes: {item.total} · Completadas: {item.done} · Canceladas:{' '}
                     {item.canceled}
                   </div>
                   <button
@@ -325,3 +325,5 @@ export default function Technicians() {
     </>
   )
 }
+
+

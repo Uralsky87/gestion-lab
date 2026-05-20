@@ -13,11 +13,17 @@ export type BatchTemplate = {
 }
 
 export type ProductionShift = 'mañana' | 'tarde'
-export type ProductionStatus = 'previsto' | 'hecho' | 'cambiado' | 'cancelado'
+export type LegacyProductionShift = 'ma\u00c3\u00b1ana'
+export type ProductionStatus = 'planificada' | 'completada' | 'cancelada'
+export type LegacyProductionStatus =
+  | 'previsto'
+  | 'hecho'
+  | 'cambiado'
+  | 'cancelado'
 
 export type ChangeLogEntry = {
   timestamp: string
-  type: 'cambiado' | 'cancelado'
+  type: 'cambiado' | 'cancelado' | 'cancelada'
   detail: string
 }
 
@@ -37,6 +43,36 @@ export type ProductionRun = {
   createdAt: string
   updatedAt: string
 }
+
+export const normalizeProductionStatus = (
+  status: ProductionStatus | LegacyProductionStatus | string,
+): ProductionStatus => {
+  switch (status) {
+    case 'hecho':
+    case 'completada':
+      return 'completada'
+    case 'cancelado':
+    case 'cancelada':
+      return 'cancelada'
+    case 'previsto':
+    case 'cambiado':
+    case 'planificada':
+    default:
+      return 'planificada'
+  }
+}
+
+export const normalizeProductionShift = (
+  shift: ProductionShift | LegacyProductionShift | string,
+): ProductionShift => (shift === 'tarde' ? 'tarde' : 'mañana')
+
+export const normalizeProductionRun = <T extends { shift: string; status: string }>(
+  run: T,
+): T & { shift: ProductionShift; status: ProductionStatus } => ({
+  ...run,
+  shift: normalizeProductionShift(run.shift),
+  status: normalizeProductionStatus(run.status),
+})
 
 export type NoteCategory =
   | 'propuesta'
@@ -91,3 +127,4 @@ export type NewTechnician = Omit<Technician, 'id' | 'createdAt' | 'updatedAt'> &
 }
 
 export type UpdateTechnician = Partial<Omit<Technician, 'id' | 'createdAt'>>
+

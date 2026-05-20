@@ -1,4 +1,9 @@
 import { db } from './db'
+import {
+  normalizeProductionRun,
+  normalizeProductionShift,
+  normalizeProductionStatus,
+} from './models'
 import type {
   BatchTemplate,
   NewBatchTemplate,
@@ -60,7 +65,7 @@ export async function createProductionRun(
   const item: ProductionRun = {
     id: ensureId(input.id),
     date: input.date,
-    shift: input.shift,
+    shift: normalizeProductionShift(input.shift),
     batchCode: input.batchCode,
     templateId: input.templateId,
     plannedUnits: input.plannedUnits,
@@ -68,7 +73,7 @@ export async function createProductionRun(
     technician: input.technician,
     notes: input.notes,
     incidents: input.incidents,
-    status: input.status,
+    status: normalizeProductionStatus(input.status),
     changeLog: input.changeLog,
     createdAt: timestamp,
     updatedAt: timestamp,
@@ -81,8 +86,19 @@ export async function updateProductionRun(
   id: string,
   changes: UpdateProductionRun,
 ): Promise<ProductionRun | undefined> {
-  await db.productionRuns.update(id, { ...changes, updatedAt: nowIso() })
-  return db.productionRuns.get(id)
+  const normalizedChanges: UpdateProductionRun & { updatedAt: string } = {
+    ...changes,
+    updatedAt: nowIso(),
+  }
+  if (changes.status) {
+    normalizedChanges.status = normalizeProductionStatus(changes.status)
+  }
+  if (changes.shift) {
+    normalizedChanges.shift = normalizeProductionShift(changes.shift)
+  }
+  await db.productionRuns.update(id, normalizedChanges)
+  const run = await db.productionRuns.get(id)
+  return run ? normalizeProductionRun(run) : undefined
 }
 
 export function deleteProductionRun(id: string) {
@@ -90,27 +106,49 @@ export function deleteProductionRun(id: string) {
 }
 
 export function getProductionRun(id: string) {
-  return db.productionRuns.get(id)
+  return db.productionRuns.get(id).then((run) =>
+    run ? normalizeProductionRun(run) : undefined,
+  )
 }
 
 export function listProductionRuns() {
-  return db.productionRuns.orderBy('date').reverse().toArray()
+  return db.productionRuns
+    .orderBy('date')
+    .reverse()
+    .toArray()
+    .then((runs) => runs.map(normalizeProductionRun))
 }
 
 export function listProductionRunsByDate(date: string) {
-  return db.productionRuns.where('date').equals(date).toArray()
+  return db.productionRuns
+    .where('date')
+    .equals(date)
+    .toArray()
+    .then((runs) => runs.map(normalizeProductionRun))
 }
 
 export function listProductionRunsByTechnician(technician: string) {
-  return db.productionRuns.where('technician').equals(technician).toArray()
+  return db.productionRuns
+    .where('technician')
+    .equals(technician)
+    .toArray()
+    .then((runs) => runs.map(normalizeProductionRun))
 }
 
 export function listProductionRunsByTemplate(templateId: string) {
-  return db.productionRuns.where('templateId').equals(templateId).toArray()
+  return db.productionRuns
+    .where('templateId')
+    .equals(templateId)
+    .toArray()
+    .then((runs) => runs.map(normalizeProductionRun))
 }
 
 export function getProductionRunByBatchCode(batchCode: string) {
-  return db.productionRuns.where('batchCode').equals(batchCode).first()
+  return db.productionRuns
+    .where('batchCode')
+    .equals(batchCode)
+    .first()
+    .then((run) => (run ? normalizeProductionRun(run) : undefined))
 }
 
 export async function createNoteEvent(

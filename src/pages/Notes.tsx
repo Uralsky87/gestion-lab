@@ -6,7 +6,12 @@ import {
   listNoteEvents,
   updateNoteEvent,
 } from '../data/repository'
-import { todayLocalIso, toLocalDateKey } from '../utils/date'
+import {
+  getCalendarDays,
+  getMonthLabel,
+  todayLocalIso,
+  toLocalDateKey,
+} from '../utils/date'
 
 type NotesFormState = {
   id?: string
@@ -14,26 +19,6 @@ type NotesFormState = {
   title: string
   body: string
   category: NoteCategory
-}
-
-const getMonthLabel = (date: Date) =>
-  date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
-
-const getCalendarDays = (baseDate: Date) => {
-  const year = baseDate.getFullYear()
-  const month = baseDate.getMonth()
-  const firstDay = new Date(year, month, 1)
-  const weekDayIndex = (firstDay.getDay() + 6) % 7
-  const startDate = new Date(year, month, 1 - weekDayIndex)
-  const days: Date[] = []
-
-  for (let i = 0; i < 42; i += 1) {
-    const day = new Date(startDate)
-    day.setDate(startDate.getDate() + i)
-    days.push(day)
-  }
-
-  return days
 }
 
 const emptyForm: NotesFormState = {

@@ -9,6 +9,7 @@ import type {
   Technician,
 } from '../data/models'
 import {
+  createBatchTemplate,
   createProductionRun,
   deleteProductionRun,
   listBatchTemplates,
@@ -16,7 +17,12 @@ import {
   listTechnicians,
   updateProductionRun,
 } from '../data/repository'
-import { todayLocalIso } from '../utils/date'
+import {
+  getCalendarDays,
+  getMonthLabel,
+  todayLocalIso,
+  toLocalDateKey,
+} from '../utils/date'
 
 type ProductionFormState = {
   id?: string
@@ -43,7 +49,7 @@ const emptyForm = (templateId = ''): ProductionFormState => ({
   technician: '',
   notes: '',
   incidents: '',
-  status: 'previsto',
+  status: 'planificada',
   changeReason: '',
 })
 
@@ -60,16 +66,35 @@ type ProductionConflictDialog = {
   replacementData: NewProductionRun
 }
 
-const startOfWeek = (date: Date) => {
-  const result = new Date(date)
-  const day = result.getDay()
-  const diff = day === 0 ? -6 : 1 - day
-  result.setDate(result.getDate() + diff)
-  result.setHours(0, 0, 0, 0)
-  return result
+type ProductionFormMode = 'create' | 'replace'
+
+type ProductionViewMode = 'day' | 'calendar'
+
+const shifts: ProductionShift[] = ['mañana', 'tarde']
+
+const statusLabels: Record<ProductionStatus, string> = {
+  planificada: 'Planificada',
+  completada: 'Completada',
+  cancelada: 'Cancelada',
 }
 
+const getVisibleStatus = (status: ProductionStatus) => status
+
 const toDateOnly = (value: string) => new Date(`${value}T00:00:00`)
+
+const addDays = (value: string, amount: number) => {
+  const date = toDateOnly(value)
+  date.setDate(date.getDate() + amount)
+  return toLocalDateKey(date)
+}
+
+const getDayLabel = (value: string) =>
+  toDateOnly(value).toLocaleDateString('es-ES', {
+    weekday: 'long',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  })
 
 const sortTemplatesByName = (a: BatchTemplate, b: BatchTemplate) =>
   a.name.localeCompare(b.name, 'es', { sensitivity: 'base' })
@@ -80,19 +105,23 @@ export default function Productions() {
   const [runs, setRuns] = useState<ProductionRun[]>([])
   const [templates, setTemplates] = useState<BatchTemplate[]>([])
   const [technicians, setTechnicians] = useState<Technician[]>([])
-  const [shiftFilter, setShiftFilter] = useState<Record<ProductionShift, boolean>>({
-    mañana: true,
-    tarde: true,
-  })
   const [form, setForm] = useState<ProductionFormState>(emptyForm())
   const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
+  const [formMode, setFormMode] = useState<ProductionFormMode>('create')
+  const [viewMode, setViewMode] = useState<ProductionViewMode>('day')
   const [selectedDate, setSelectedDate] = useState(todayLocalIso())
-  const dateInputRef = useRef<HTMLInputElement | null>(null)
+  const [calendarMonth, setCalendarMonth] = useState(() => {
+    const today = new Date()
+    return new Date(today.getFullYear(), today.getMonth(), 1)
+  })
   const formRef = useRef<HTMLElement | null>(null)
   const [isTotalStatsOpen, setIsTotalStatsOpen] = useState(false)
   const [noteDialog, setNoteDialog] = useState<RunDetailDialog | null>(null)
   const [quickStatusRunId, setQuickStatusRunId] = useState<string | null>(null)
+  const [quickTemplateName, setQuickTemplateName] = useState('')
+  const [quickTemplateError, setQuickTemplateError] = useState('')
+  const [isQuickTemplateOpen, setIsQuickTemplateOpen] = useState(false)
   const [conflictDialog, setConflictDialog] =
     useState<ProductionConflictDialog | null>(null)
 
@@ -127,6 +156,8 @@ export default function Productions() {
     if (!nextSelectedDate) return
 
     setSelectedDate(nextSelectedDate)
+    const nextDate = toDateOnly(nextSelectedDate)
+    setCalendarMonth(new Date(nextDate.getFullYear(), nextDate.getMonth(), 1))
     navigate(location.pathname, { replace: true, state: null })
   }, [location.pathname, location.state, navigate])
 
@@ -142,6 +173,27 @@ export default function Productions() {
 
   const hasRunIncidents = (run: ProductionRun) => Boolean(run.incidents?.trim())
 
+  const selectedDayRuns = useMemo(() => {
+    return runs
+      .filter((run) => run.date === selectedDate)
+      .sort((a, b) => shifts.indexOf(a.shift) - shifts.indexOf(b.shift))
+  }, [runs, selectedDate])
+
+  const runsByDate = useMemo(() => {
+    return runs.reduce<Record<string, ProductionRun[]>>((acc, run) => {
+      acc[run.date] = acc[run.date] ? [...acc[run.date], run] : [run]
+      return acc
+    }, {})
+  }, [runs])
+
+  const calendarDays = useMemo(
+    () => getCalendarDays(calendarMonth),
+    [calendarMonth],
+  )
+
+  const getRunByShift = (shift: ProductionShift) =>
+    selectedDayRuns.find((run) => run.shift === shift)
+
   const openRunDetail = (run: ProductionRun, kind: RunDetailKind) => {
     const content = kind === 'incidents' ? run.incidents?.trim() : run.notes?.trim()
     if (!content) return
@@ -152,23 +204,12 @@ export default function Productions() {
     })
   }
 
-  const filteredRuns = useMemo(() => {
-    const weekStart = startOfWeek(new Date(`${selectedDate}T00:00:00`))
-    const weekEnd = new Date(weekStart)
-    weekEnd.setDate(weekStart.getDate() + 6)
-
-    return runs
-      .filter((run) => {
-        const runDate = toDateOnly(run.date)
-        const inWeek = runDate >= weekStart && runDate <= weekEnd
-        const shiftMatch = shiftFilter[run.shift]
-        return inWeek && shiftMatch
-      })
-      .sort((a, b) => b.date.localeCompare(a.date))
-  }, [runs, shiftFilter, selectedDate])
-
   const weekStats = useMemo(() => {
-    const weekStart = startOfWeek(new Date(`${selectedDate}T00:00:00`))
+    const weekStart = new Date(`${selectedDate}T00:00:00`)
+    const day = weekStart.getDay()
+    const diff = day === 0 ? -6 : 1 - day
+    weekStart.setDate(weekStart.getDate() + diff)
+    weekStart.setHours(0, 0, 0, 0)
     const weekEnd = new Date(weekStart)
     weekEnd.setDate(weekStart.getDate() + 6)
 
@@ -259,9 +300,71 @@ export default function Productions() {
 
   const resetForm = () => {
     setForm(emptyForm(templates[0]?.id ?? ''))
+    setFormMode('create')
     setError('')
     setShowForm(false)
     setConflictDialog(null)
+  }
+
+  const buildDefaultForm = (
+    shift: ProductionShift,
+    date = selectedDate,
+  ): ProductionFormState => ({
+    ...emptyForm(templates[0]?.id ?? ''),
+    date,
+    shift,
+    technician: technicians[0]?.initials ?? '',
+  })
+
+  const describeRun = (run: ProductionRun) => {
+    const templateName = getTemplateName(run.templateId)
+    const statusLabel = statusLabels[getVisibleStatus(run.status)]
+    return `${run.batchCode} - ${templateName} - ${run.technician} - ${statusLabel}`
+  }
+
+  const handleCreateInSlot = (shift: ProductionShift) => {
+    setForm(buildDefaultForm(shift))
+    setFormMode('create')
+    setError('')
+    setShowForm(true)
+  }
+
+  const handlePrevDay = () => {
+    const nextDate = addDays(selectedDate, -1)
+    const nextMonth = toDateOnly(nextDate)
+    setSelectedDate(nextDate)
+    setCalendarMonth(new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1))
+  }
+
+  const handleNextDay = () => {
+    const nextDate = addDays(selectedDate, 1)
+    const nextMonth = toDateOnly(nextDate)
+    setSelectedDate(nextDate)
+    setCalendarMonth(new Date(nextMonth.getFullYear(), nextMonth.getMonth(), 1))
+  }
+
+  const handleSelectCalendarDay = (dateKey: string) => {
+    setSelectedDate(dateKey)
+    setViewMode('day')
+  }
+
+  const handleCreateQuickTemplate = async () => {
+    const name = quickTemplateName.trim()
+    if (!name) {
+      setQuickTemplateError('El nombre es obligatorio.')
+      return
+    }
+
+    const createdTemplate = await createBatchTemplate({
+      name,
+      materials: [],
+    })
+    const nextTemplates = [...templates, createdTemplate].sort(sortTemplatesByName)
+    setTemplates(nextTemplates)
+    setForm((prev) => ({ ...prev, templateId: createdTemplate.id }))
+    setQuickTemplateName('')
+    setQuickTemplateError('')
+    setIsQuickTemplateOpen(false)
   }
 
   const persistProduction = async (
@@ -275,6 +378,7 @@ export default function Productions() {
     }
 
     await loadData()
+    setSelectedDate(data.date)
     resetForm()
   }
 
@@ -286,7 +390,7 @@ export default function Productions() {
       ? Number(form.actualUnits)
       : undefined
     const changeReason = form.changeReason.trim()
-    const isCancelled = form.status === 'cancelado'
+    const isCancelled = form.status === 'cancelada'
 
     if (!form.date) {
       setError('La fecha es obligatoria.')
@@ -320,14 +424,29 @@ export default function Productions() {
       return
     }
 
-    const changeLogUpdate = isCancelled
+    if (formMode === 'replace' && !changeReason) {
+      setError('Indica el motivo del cambio.')
+      return
+    }
+
+    const currentRun = runs.find((run) => run.id === form.id)
+    const existingChangeLog = (currentRun?.changeLog ?? []).filter(Boolean)
+
+    const changeLogUpdate = formMode === 'replace' && currentRun
       ? [
-          ...((runs.find((run) => run.id === form.id)?.changeLog ?? []).filter(
-            Boolean,
-          )),
+          ...existingChangeLog,
           {
             timestamp: new Date().toISOString(),
-            type: 'cancelado' as const,
+            type: 'cambiado' as const,
+            detail: `Anterior: ${describeRun(currentRun)}. Motivo: ${changeReason}`,
+          },
+        ]
+      : isCancelled
+      ? [
+          ...existingChangeLog,
+          {
+            timestamp: new Date().toISOString(),
+            type: 'cancelada' as const,
             detail: changeReason,
           },
         ]
@@ -364,29 +483,22 @@ export default function Productions() {
     if (form.id) {
       await updateProductionRun(form.id, {
         ...productionData,
+        changeLog: changeLogUpdate ?? currentRun?.changeLog,
       })
       await loadData()
+      setSelectedDate(form.date)
       resetForm()
     } else {
       await persistProduction(productionData)
     }
   }
 
-  const handleEdit = (run: ProductionRun) => {
+  const handleReplace = (run: ProductionRun) => {
     setForm({
+      ...buildDefaultForm(run.shift, run.date),
       id: run.id,
-      date: run.date,
-      shift: run.shift,
-      batchCode: run.batchCode,
-      templateId: run.templateId,
-      plannedUnits: String(run.plannedUnits),
-      actualUnits: run.actualUnits != null ? String(run.actualUnits) : '',
-      technician: run.technician,
-      notes: run.notes ?? '',
-      incidents: run.incidents ?? '',
-      status: run.status === 'cambiado' ? 'previsto' : run.status,
-      changeReason: '',
     })
+    setFormMode('replace')
     setError('')
     setShowForm(true)
   }
@@ -405,7 +517,7 @@ export default function Productions() {
 
   const handleQuickStatusChange = async (
     run: ProductionRun,
-    nextStatus: 'previsto' | 'hecho' | 'cancelado',
+    nextStatus: 'planificada' | 'completada' | 'cancelada',
   ) => {
     if (run.status === nextStatus) return
 
@@ -421,13 +533,6 @@ export default function Productions() {
     }
   }
 
-  const toggleShiftFilter = (shift: ProductionShift) => {
-    setShiftFilter((prev) => ({
-      ...prev,
-      [shift]: !prev[shift],
-    }))
-  }
-
   const handleConfirmConflictSwap = async () => {
     if (!conflictDialog) return
 
@@ -438,19 +543,243 @@ export default function Productions() {
 
   return (
     <>
-      <section className="card">
-        <button
-          className="primary-button"
-          type="button"
-          onClick={() => setShowForm((prev) => !prev)}
-        >
-          {showForm ? 'Cerrar formulario' : 'Añadir producción'}
-        </button>
+      <section className="card production-day-card">
+        <div className="production-day-header">
+          <button
+            className="ghost-button date-nav-button"
+            type="button"
+            onClick={handlePrevDay}
+            aria-label="Dia anterior"
+          >
+            {'<'}
+          </button>
+          <div className="production-day-title">
+            <span>{getDayLabel(selectedDate)}</span>
+          </div>
+          <button
+            className="ghost-button date-nav-button"
+            type="button"
+            onClick={handleNextDay}
+            aria-label="Dia siguiente"
+          >
+            {'>'}
+          </button>
+        </div>
+
+        <div className="production-view-toggle">
+          <button
+            className={`toggle-button${viewMode === 'day' ? ' active' : ''}`}
+            type="button"
+            onClick={() => setViewMode('day')}
+          >
+            Dia
+          </button>
+          <button
+            className={`toggle-button${viewMode === 'calendar' ? ' active' : ''}`}
+            type="button"
+            onClick={() => setViewMode('calendar')}
+          >
+            Calendario
+          </button>
+        </div>
+
+        {viewMode === 'calendar' ? (
+          <div className="production-calendar">
+            <div className="calendar-header">
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() =>
+                  setCalendarMonth(
+                    (prev) =>
+                      new Date(prev.getFullYear(), prev.getMonth() - 1, 1),
+                  )
+                }
+              >
+                {'<'}
+              </button>
+              <div className="calendar-title">{getMonthLabel(calendarMonth)}</div>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() =>
+                  setCalendarMonth(
+                    (prev) =>
+                      new Date(prev.getFullYear(), prev.getMonth() + 1, 1),
+                  )
+                }
+              >
+                {'>'}
+              </button>
+            </div>
+            <div className="calendar-weekdays">
+              <span>Lun</span>
+              <span>Mar</span>
+              <span>Mie</span>
+              <span>Jue</span>
+              <span>Vie</span>
+              <span>Sab</span>
+              <span>Dom</span>
+            </div>
+            <div className="calendar-grid">
+              {calendarDays.map((day) => {
+                const dateKey = toLocalDateKey(day)
+                const dayRuns = runsByDate[dateKey] ?? []
+                const isCurrentMonth = day.getMonth() === calendarMonth.getMonth()
+                const isSelected = selectedDate === dateKey
+
+                return (
+                  <button
+                    key={dateKey}
+                    className={`calendar-day${
+                      isCurrentMonth ? '' : ' is-muted'
+                    }${isSelected ? ' is-selected' : ''}`}
+                    type="button"
+                    onClick={() => handleSelectCalendarDay(dateKey)}
+                  >
+                    <span className="calendar-day-number">{day.getDate()}</span>
+                    <div className="calendar-dots">
+                      {shifts.map((shift) => {
+                        const run = dayRuns.find((item) => item.shift === shift)
+                        const status = run
+                          ? getVisibleStatus(run.status)
+                          : 'empty'
+                        return (
+                          <div className="calendar-shift-row" key={shift}>
+                            <span className={`calendar-dot status-${status}`} />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ) : (
+          <div className="production-slots">
+            {shifts.map((shift) => {
+              const run = getRunByShift(shift)
+              const statusValue = run ? getVisibleStatus(run.status) : undefined
+
+              return (
+                <article
+                  className={`production-slot${run ? ' has-run' : ' is-empty'}`}
+                  key={shift}
+                >
+                  <div className="production-slot-header">
+                    <div>
+                      <h3>{shift === 'mañana' ? 'Mañana' : 'Tarde'}</h3>
+                      <p>{run ? getTemplateName(run.templateId) : 'Sin producción'}</p>
+                    </div>
+                    {run ? (
+                      <span className={`status-badge status-${run.status}`}>
+                        {statusValue ? statusLabels[statusValue] : run.status}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {run ? (
+                    <>
+                      <div className="production-slot-body">
+                        <div className="list-item-title">{run.batchCode}</div>
+                        <div className="list-item-subtitle">
+                          {run.technician} - Plan: {run.plannedUnits}
+                          {run.actualUnits != null ? ` - Real: ${run.actualUnits}` : ''}
+                        </div>
+                        <div className="tag-row">
+                          {hasRunIncidents(run) ? (
+                            <button
+                              className="note-alert note-alert-incident"
+                              type="button"
+                              onClick={() => openRunDetail(run, 'incidents')}
+                              aria-label="Ver incidentes"
+                              title="Ver incidentes"
+                            >
+                              !
+                            </button>
+                          ) : null}
+                          {hasRunNotes(run) ? (
+                            <button
+                              className="note-alert note-alert-note"
+                              type="button"
+                              onClick={() => openRunDetail(run, 'notes')}
+                              aria-label="Ver notas"
+                              title="Ver notas"
+                            >
+                              !
+                            </button>
+                          ) : null}
+                        </div>
+                        {run.changeLog && run.changeLog.length > 0 ? (
+                          <div className="history">
+                            {run.changeLog.map((entry, index) => (
+                              <div key={`${entry.timestamp}-${index}`}>
+                                {entry.detail}
+                              </div>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="slot-status-row">
+                        {(['planificada', 'completada', 'cancelada'] as const).map(
+                          (status) => (
+                            <button
+                              className={`toggle-button${
+                                statusValue === status ? ' active' : ''
+                              }`}
+                              type="button"
+                              disabled={quickStatusRunId === run.id}
+                              onClick={() =>
+                                void handleQuickStatusChange(run, status)
+                              }
+                              key={status}
+                            >
+                              {statusLabels[status]}
+                            </button>
+                          ),
+                        )}
+                      </div>
+                      <div className="production-slot-actions">
+                        <button
+                          className="secondary-button"
+                          type="button"
+                          onClick={() => handleReplace(run)}
+                        >
+                          Cambiar
+                        </button>
+                        <button
+                          className="ghost-button"
+                          type="button"
+                          onClick={() => void handleDelete(run)}
+                        >
+                          Eliminar
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <button
+                      className="add-slot-button"
+                      type="button"
+                      onClick={() => handleCreateInSlot(shift)}
+                      aria-label={`Crear producción de ${shift}`}
+                    >
+                      +
+                    </button>
+                  )}
+                </article>
+              )
+            })}
+          </div>
+        )}
       </section>
 
       {showForm ? (
         <section className="card" ref={formRef}>
           <h3>{form.id ? 'Editar producción' : 'Nueva producción'}</h3>
+          {formMode === 'replace' ? (
+            <p>Rellena la nueva producción y guarda el motivo del cambio.</p>
+          ) : null}
         <div className="form-grid">
           <div className="form-row">
             <label className="form-label" htmlFor="runDate">
@@ -509,23 +838,37 @@ export default function Productions() {
             <label className="form-label" htmlFor="templateId">
               Lote
             </label>
-            <select
-              id="templateId"
-              className="form-input"
-              value={form.templateId}
-              onChange={(event) =>
-                setForm((prev) => ({ ...prev, templateId: event.target.value }))
-              }
-            >
-              {templates.length === 0 ? (
-                <option value="">Sin lotes</option>
-              ) : null}
-              {templates.map((template) => (
-                <option key={template.id} value={template.id}>
-                  {template.name}
-                </option>
-              ))}
-            </select>
+            <div className="template-select-row">
+              <select
+                id="templateId"
+                className="form-input"
+                value={form.templateId}
+                onChange={(event) =>
+                  setForm((prev) => ({ ...prev, templateId: event.target.value }))
+                }
+              >
+                {templates.length === 0 ? (
+                  <option value="">Sin lotes</option>
+                ) : null}
+                {templates.map((template) => (
+                  <option key={template.id} value={template.id}>
+                    {template.name}
+                  </option>
+                ))}
+              </select>
+              <button
+                className="secondary-button quick-template-button"
+                type="button"
+                onClick={() => {
+                  setQuickTemplateError('')
+                  setIsQuickTemplateOpen(true)
+                }}
+                aria-label="Crear lote"
+                title="Crear lote"
+              >
+                +
+              </button>
+            </div>
           </div>
           <div className="form-row">
             <label className="form-label" htmlFor="plannedUnits">
@@ -605,14 +948,14 @@ export default function Productions() {
                 }))
               }
             >
-              <option value="hecho">Hecho</option>
-              <option value="previsto">Previsto</option>
-              <option value="cancelado">Cancelado</option>
+              <option value="planificada">Planificada</option>
+              <option value="completada">Completada</option>
+              <option value="cancelada">Cancelada</option>
             </select>
           </div>
         </div>
 
-        {form.status === 'cancelado' ? (
+        {form.status === 'cancelada' || formMode === 'replace' ? (
           <div className="form-row">
             <label className="form-label" htmlFor="changeReason">
               Motivo
@@ -691,159 +1034,6 @@ export default function Productions() {
           </div>
         </section>
       ) : null}
-
-      <section className="card">
-        <h3>Semana actual</h3>
-        <div className="form-grid">
-          <div className="form-row">
-            <label className="form-label" htmlFor="weekPicker">
-              Elegir día
-            </label>
-            <div className="date-picker-row">
-              <input
-                ref={dateInputRef}
-                id="weekPicker"
-                className="form-input"
-                type="date"
-                value={selectedDate}
-                onChange={(event) => setSelectedDate(event.target.value)}
-              />
-              <button
-                className="secondary-button"
-                type="button"
-                onClick={() =>
-                  dateInputRef.current?.showPicker
-                    ? dateInputRef.current.showPicker()
-                    : dateInputRef.current?.focus()
-                }
-              >
-                Calendario
-              </button>
-            </div>
-          </div>
-          <div className="form-row">
-            <label className="form-label">
-              Turno
-            </label>
-            <div className="toggle-row shift-filter-row">
-              <label className="quick-status-option">
-                <input
-                  type="checkbox"
-                  checked={shiftFilter.mañana}
-                  onChange={() => toggleShiftFilter('mañana')}
-                />
-                <span>Mañana</span>
-              </label>
-              <label className="quick-status-option">
-                <input
-                  type="checkbox"
-                  checked={shiftFilter.tarde}
-                  onChange={() => toggleShiftFilter('tarde')}
-                />
-                <span>Tarde</span>
-              </label>
-            </div>
-          </div>
-        </div>
-        {filteredRuns.length === 0 ? (
-          <p>No hay producciones para esta semana.</p>
-        ) : (
-          <div className="list">
-            {filteredRuns.map((run) => (
-              <article
-                key={run.id}
-                className={`list-item${
-                  run.date === selectedDate ? ' is-highlighted' : ''
-                }`}
-              >
-                <div className="list-item-main">
-                  <div className="list-item-title">
-                    {run.batchCode} · {getTemplateName(run.templateId)}
-                  </div>
-                  <div className="list-item-subtitle">
-                    {run.date} · {run.shift} · {run.technician}
-                  </div>
-                  <div className="tag-row">
-                    <span className={`status-badge status-${run.status}`}>
-                      {run.status}
-                    </span>
-                    <span className="tag">Plan: {run.plannedUnits}</span>
-                    {run.actualUnits != null ? (
-                      <span className="tag">Real: {run.actualUnits}</span>
-                    ) : null}
-                    {hasRunIncidents(run) ? (
-                      <button
-                        className="note-alert note-alert-incident"
-                        type="button"
-                        onClick={() => openRunDetail(run, 'incidents')}
-                        aria-label="Ver incidentes"
-                        title="Ver incidentes"
-                      >
-                        !
-                      </button>
-                    ) : null}
-                    {hasRunNotes(run) ? (
-                      <button
-                        className="note-alert note-alert-note"
-                        type="button"
-                        onClick={() => openRunDetail(run, 'notes')}
-                        aria-label="Ver notas"
-                        title="Ver notas"
-                      >
-                        !
-                      </button>
-                    ) : null}
-                  </div>
-                  {run.changeLog && run.changeLog.length > 0 ? (
-                    <div className="history">
-                      Último cambio: {run.changeLog[run.changeLog.length - 1].detail}
-                    </div>
-                  ) : null}
-                </div>
-                <div className="list-item-actions">
-                  <button
-                    className="secondary-button"
-                    type="button"
-                    onClick={() => handleEdit(run)}
-                  >
-                    Editar
-                  </button>
-                  <div className="quick-status-group" aria-label="Estado rápido">
-                    <label className="quick-status-option quick-status-option-done">
-                      <input
-                        type="checkbox"
-                        checked={run.status === 'hecho'}
-                        disabled={quickStatusRunId === run.id}
-                        onChange={(event) =>
-                          void handleQuickStatusChange(
-                            run,
-                            event.target.checked ? 'hecho' : 'previsto',
-                          )
-                        }
-                      />
-                      <span>Hecho</span>
-                    </label>
-                    <label className="quick-status-option quick-status-option-cancelled">
-                      <input
-                        type="checkbox"
-                        checked={run.status === 'cancelado'}
-                        disabled={quickStatusRunId === run.id}
-                        onChange={(event) =>
-                          void handleQuickStatusChange(
-                            run,
-                            event.target.checked ? 'cancelado' : 'previsto',
-                          )
-                        }
-                      />
-                      <span>Anulado</span>
-                    </label>
-                  </div>
-                </div>
-              </article>
-            ))}
-          </div>
-        )}
-      </section>
 
       <section className="card">
         <h3>Estadísticas rápidas</h3>
@@ -997,6 +1187,66 @@ export default function Productions() {
         </div>
       ) : null}
 
+      {isQuickTemplateOpen ? (
+        <div
+          className="note-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setIsQuickTemplateOpen(false)}
+        >
+          <div
+            className="note-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="note-modal-header">
+              <h4>Crear lote</h4>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setIsQuickTemplateOpen(false)}
+              >
+                Cerrar
+              </button>
+            </div>
+            <div className="form-row">
+              <label className="form-label" htmlFor="quickTemplateName">
+                Nombre
+              </label>
+              <input
+                id="quickTemplateName"
+                className="form-input"
+                value={quickTemplateName}
+                onChange={(event) => {
+                  setQuickTemplateName(event.target.value)
+                  setQuickTemplateError('')
+                }}
+                placeholder="Nombre del lote"
+                autoFocus
+              />
+            </div>
+            {quickTemplateError ? (
+              <div className="form-error">{quickTemplateError}</div>
+            ) : null}
+            <div className="form-actions">
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setIsQuickTemplateOpen(false)}
+              >
+                Cancelar
+              </button>
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => void handleCreateQuickTemplate()}
+              >
+                Crear y seleccionar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {conflictDialog ? (
         <div
           className="note-modal-backdrop"
@@ -1055,3 +1305,4 @@ export default function Productions() {
     </>
   )
 }
+

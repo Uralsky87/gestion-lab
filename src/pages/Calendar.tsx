@@ -6,7 +6,12 @@ import {
   listProductionRuns,
   updateProductionRun,
 } from '../data/repository'
-import { todayLocalIso, toLocalDateKey } from '../utils/date'
+import {
+  getCalendarDays,
+  getMonthLabel,
+  todayLocalIso,
+  toLocalDateKey,
+} from '../utils/date'
 
 type RunDetailKind = 'notes' | 'incidents'
 
@@ -14,26 +19,6 @@ type RunDetailDialog = {
   title: string
   content: string[]
   kind: RunDetailKind
-}
-
-const getMonthLabel = (date: Date) =>
-  date.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })
-
-const getCalendarDays = (baseDate: Date) => {
-  const year = baseDate.getFullYear()
-  const month = baseDate.getMonth()
-  const firstDay = new Date(year, month, 1)
-  const weekDayIndex = (firstDay.getDay() + 6) % 7
-  const startDate = new Date(year, month, 1 - weekDayIndex)
-  const days: Date[] = []
-
-  for (let i = 0; i < 42; i += 1) {
-    const day = new Date(startDate)
-    day.setDate(startDate.getDate() + i)
-    days.push(day)
-  }
-
-  return days
 }
 
 export default function Calendar() {
@@ -105,10 +90,10 @@ export default function Calendar() {
   const getShiftStatus = (dayRuns: ProductionRun[], shift: 'mañana' | 'tarde') => {
     const shiftRuns = dayRuns.filter((run) => run.shift === shift)
     if (shiftRuns.length === 0) return 'empty'
-    if (shiftRuns.some((run) => run.status === 'cancelado')) return 'cancelado'
-    if (shiftRuns.some((run) => run.status === 'previsto' || run.status === 'cambiado'))
-      return 'previsto'
-    if (shiftRuns.some((run) => run.status === 'hecho')) return 'hecho'
+    if (shiftRuns.some((run) => run.status === 'cancelada')) return 'cancelada'
+    if (shiftRuns.some((run) => run.status === 'planificada'))
+      return 'planificada'
+    if (shiftRuns.some((run) => run.status === 'completada')) return 'completada'
     return 'empty'
   }
 
@@ -131,7 +116,7 @@ export default function Calendar() {
 
   const handleStatusChange = async (
     run: ProductionRun,
-    nextStatus: 'previsto' | 'hecho' | 'cancelado',
+    nextStatus: 'planificada' | 'completada' | 'cancelada',
   ) => {
     setBusyRunId(run.id)
     try {
@@ -267,16 +252,16 @@ export default function Calendar() {
         </div>
         <div className="calendar-legend">
           <div className="legend-item">
-            <span className="calendar-dot status-previsto" />
-            <span>Pendiente</span>
+            <span className="calendar-dot status-planificada" />
+            <span>Planificada</span>
           </div>
           <div className="legend-item">
-            <span className="calendar-dot status-hecho" />
-            <span>Hecho</span>
+            <span className="calendar-dot status-completada" />
+            <span>Completada</span>
           </div>
           <div className="legend-item">
-            <span className="calendar-dot status-cancelado" />
-            <span>Anulado</span>
+            <span className="calendar-dot status-cancelada" />
+            <span>Cancelada</span>
           </div>
         </div>
       </section>
@@ -343,17 +328,17 @@ export default function Calendar() {
                     {statusMenuRunId === run.id ? (
                       <select
                         className="form-input"
-                        value={run.status === 'cambiado' ? 'previsto' : run.status}
+                        value={run.status}
                         onChange={(event) =>
                           void handleStatusChange(
                             run,
-                            event.target.value as 'previsto' | 'hecho' | 'cancelado',
+                            event.target.value as 'planificada' | 'completada' | 'cancelada',
                           )
                         }
                       >
-                        <option value="previsto">Pendiente</option>
-                        <option value="hecho">Hecho</option>
-                        <option value="cancelado">Anulado</option>
+                        <option value="planificada">Planificada</option>
+                        <option value="completada">Completada</option>
+                        <option value="cancelada">Cancelada</option>
                       </select>
                     ) : null}
                   </div>
@@ -437,3 +422,4 @@ export default function Calendar() {
     </>
   )
 }
+

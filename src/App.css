@@ -203,6 +203,19 @@
   align-items: center;
 }
 
+.template-select-row {
+  display: grid;
+  grid-template-columns: 1fr 48px;
+  gap: 8px;
+  align-items: center;
+}
+
+.quick-template-button {
+  min-width: 48px;
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .form-error {
   background: rgba(246, 88, 88, 0.12);
   color: #b93030;
@@ -458,17 +471,17 @@
   line-height: 1;
 }
 
-.calendar-dot.status-previsto {
+.calendar-dot.status-planificada {
   background: #3b6ef6;
   border-color: #3b6ef6;
 }
 
-.calendar-dot.status-hecho {
+.calendar-dot.status-completada {
   background: #2eb67d;
   border-color: #2eb67d;
 }
 
-.calendar-dot.status-cancelado {
+.calendar-dot.status-cancelada {
   background: #f65858;
   border-color: #f65858;
 }
@@ -506,6 +519,113 @@
 .calendar-chip.more {
   background: rgba(0, 0, 0, 0.06);
   color: var(--text-muted);
+}
+
+.production-day-card {
+  gap: 14px;
+}
+
+.production-day-header {
+  display: grid;
+  grid-template-columns: 44px 1fr 44px;
+  align-items: center;
+  gap: 8px;
+}
+
+.date-nav-button {
+  min-width: 44px;
+  padding: 10px 0;
+}
+
+.production-day-title {
+  text-align: center;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-strong);
+  text-transform: capitalize;
+}
+
+.production-view-toggle {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.production-calendar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.production-slots {
+  display: grid;
+  gap: 12px;
+}
+
+.production-slot {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 170px;
+}
+
+.production-slot.is-empty {
+  border-style: dashed;
+  background: rgba(59, 110, 246, 0.04);
+  align-items: stretch;
+}
+
+.production-slot-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.production-slot-header h3 {
+  margin: 0;
+}
+
+.production-slot-header p {
+  margin-top: 2px;
+}
+
+.production-slot-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.production-slot-actions,
+.slot-status-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.slot-status-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.slot-status-row .toggle-button {
+  padding: 9px 6px;
+  font-size: 12px;
+}
+
+.add-slot-button {
+  flex: 1;
+  min-height: 112px;
+  border: 1px dashed rgba(59, 110, 246, 0.55);
+  border-radius: 14px;
+  background: rgba(59, 110, 246, 0.08);
+  color: var(--primary);
+  font-size: 34px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .timeline {
@@ -704,22 +824,17 @@
   text-transform: capitalize;
 }
 
-.status-hecho {
+.status-completada {
   background: rgba(46, 182, 125, 0.15);
   color: #1a9a65;
 }
 
-.status-previsto {
+.status-planificada {
   background: rgba(59, 110, 246, 0.15);
   color: var(--primary);
 }
 
-.status-cambiado {
-  background: rgba(242, 181, 63, 0.2);
-  color: #ad6b00;
-}
-
-.status-cancelado {
+.status-cancelada {
   background: rgba(246, 88, 88, 0.18);
   color: #c03232;
 }
@@ -927,4 +1042,9 @@
   .calendar-day {
     min-height: 120px;
   }
+
+  .production-slots {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
+

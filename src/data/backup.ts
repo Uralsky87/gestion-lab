@@ -1,7 +1,13 @@
-import type { BatchTemplate, NoteEvent, ProductionRun, Technician } from './models'
+import {
+  normalizeProductionRun,
+  type BatchTemplate,
+  type NoteEvent,
+  type ProductionRun,
+  type Technician,
+} from './models'
 import { db } from './db'
 
-export const SCHEMA_VERSION = 2
+export const SCHEMA_VERSION = 4
 
 export type BackupPayloadV1 = {
   schemaVersion: 1
@@ -24,9 +30,35 @@ export type BackupPayloadV2 = {
   }
 }
 
-export type BackupPayload = BackupPayloadV1 | BackupPayloadV2
+export type BackupPayloadV3 = {
+  schemaVersion: 3
+  exportedAt: string
+  data: {
+    batchTemplates: BatchTemplate[]
+    productionRuns: ProductionRun[]
+    noteEvents: NoteEvent[]
+    technicians: Technician[]
+  }
+}
 
-export const exportBackup = async (): Promise<BackupPayloadV2> => {
+export type BackupPayloadV4 = {
+  schemaVersion: 4
+  exportedAt: string
+  data: {
+    batchTemplates: BatchTemplate[]
+    productionRuns: ProductionRun[]
+    noteEvents: NoteEvent[]
+    technicians: Technician[]
+  }
+}
+
+export type BackupPayload =
+  | BackupPayloadV1
+  | BackupPayloadV2
+  | BackupPayloadV3
+  | BackupPayloadV4
+
+export const exportBackup = async (): Promise<BackupPayloadV4> => {
   const [batchTemplates, productionRuns, noteEvents, technicians] =
     await Promise.all([
       db.batchTemplates.toArray(),
@@ -40,7 +72,7 @@ export const exportBackup = async (): Promise<BackupPayloadV2> => {
     exportedAt: new Date().toISOString(),
     data: {
       batchTemplates,
-      productionRuns,
+      productionRuns: productionRuns.map(normalizeProductionRun),
       noteEvents,
       technicians,
     },
@@ -52,7 +84,14 @@ const isArray = (value: unknown): value is unknown[] => Array.isArray(value)
 export const validateBackup = (payload: unknown): payload is BackupPayload => {
   if (!payload || typeof payload !== 'object') return false
   const record = payload as BackupPayload
-  if (record.schemaVersion !== 1 && record.schemaVersion !== 2) return false
+  if (
+    record.schemaVersion !== 1 &&
+    record.schemaVersion !== 2 &&
+    record.schemaVersion !== 3 &&
+    record.schemaVersion !== 4
+  ) {
+    return false
+  }
   if (!record.data || typeof record.data !== 'object') return false
 
   if (record.schemaVersion === 1) {
@@ -67,7 +106,10 @@ export const validateBackup = (payload: unknown): payload is BackupPayload => {
   }
 
   const { batchTemplates, productionRuns, noteEvents, technicians } =
-    record.data as BackupPayloadV2['data']
+    record.data as
+      | BackupPayloadV2['data']
+      | BackupPayloadV3['data']
+      | BackupPayloadV4['data']
 
   return (
     isArray(batchTemplates) &&
@@ -77,22 +119,50 @@ export const validateBackup = (payload: unknown): payload is BackupPayload => {
   )
 }
 
-export const migrateBackup = (payload: BackupPayload): BackupPayloadV2 => {
+export const migrateBackup = (payload: BackupPayload): BackupPayloadV4 => {
   switch (payload.schemaVersion) {
     case 1:
       return {
-        schemaVersion: 2,
+        schemaVersion: 4,
         exportedAt: payload.exportedAt,
         data: {
           batchTemplates: payload.data.batchTemplates,
-          productionRuns: payload.data.productionRuns,
+          productionRuns: payload.data.productionRuns.map(normalizeProductionRun),
           noteEvents: payload.data.noteEvents,
           technicians: [],
         },
       }
     case 2:
+      return {
+        schemaVersion: 4,
+        exportedAt: payload.exportedAt,
+        data: {
+          batchTemplates: payload.data.batchTemplates,
+          productionRuns: payload.data.productionRuns.map(normalizeProductionRun),
+          noteEvents: payload.data.noteEvents,
+          technicians: payload.data.technicians,
+        },
+      }
+    case 3:
+      return {
+        schemaVersion: 4,
+        exportedAt: payload.exportedAt,
+        data: {
+          batchTemplates: payload.data.batchTemplates,
+          productionRuns: payload.data.productionRuns.map(normalizeProductionRun),
+          noteEvents: payload.data.noteEvents,
+          technicians: payload.data.technicians,
+        },
+      }
+    case 4:
     default:
-      return payload
+      return {
+        ...payload,
+        data: {
+          ...payload.data,
+          productionRuns: payload.data.productionRuns.map(normalizeProductionRun),
+        },
+      }
   }
 }
 
