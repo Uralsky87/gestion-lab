@@ -457,6 +457,11 @@
   border: 1px solid var(--border);
 }
 
+.calendar-dot.is-preparation {
+  border-radius: 2px;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+}
+
 .calendar-note-dot {
   width: 10px;
   height: 10px;
@@ -623,9 +628,23 @@
   border-radius: 14px;
   background: rgba(59, 110, 246, 0.08);
   color: var(--primary);
-  font-size: 34px;
   font-weight: 600;
   cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.add-slot-icon {
+  font-size: 30px;
+  line-height: 1;
+}
+
+.add-slot-label {
+  font-size: 13px;
+  line-height: 1;
 }
 
 .timeline {

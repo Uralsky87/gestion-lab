@@ -66,6 +66,25 @@ export class GestionLabDB extends Dexie {
             run.status = normalizeProductionStatus(run.status)
           }),
       )
+
+    this.version(5)
+      .stores({
+        batchTemplates: '&id, name, *tags, createdAt, updatedAt',
+        productionRuns:
+          '&id, date, shift, runType, batchCode, templateId, productionName, technician, status, createdAt, updatedAt',
+        noteEvents: '&id, date, category, createdAt, updatedAt',
+        technicians: '&id, initials, createdAt, updatedAt',
+      })
+      .upgrade((tx) =>
+        tx
+          .table('productionRuns')
+          .toCollection()
+          .modify((run) => {
+            run.runType = run.runType === 'preparacion' ? 'preparacion' : 'lote'
+            run.shift = normalizeProductionShift(run.shift)
+            run.status = normalizeProductionStatus(run.status)
+          }),
+      )
   }
 }
 

@@ -7,7 +7,7 @@ import {
 } from './models'
 import { db } from './db'
 
-export const SCHEMA_VERSION = 4
+export const SCHEMA_VERSION = 5
 
 export type BackupPayloadV1 = {
   schemaVersion: 1
@@ -52,13 +52,25 @@ export type BackupPayloadV4 = {
   }
 }
 
+export type BackupPayloadV5 = {
+  schemaVersion: 5
+  exportedAt: string
+  data: {
+    batchTemplates: BatchTemplate[]
+    productionRuns: ProductionRun[]
+    noteEvents: NoteEvent[]
+    technicians: Technician[]
+  }
+}
+
 export type BackupPayload =
   | BackupPayloadV1
   | BackupPayloadV2
   | BackupPayloadV3
   | BackupPayloadV4
+  | BackupPayloadV5
 
-export const exportBackup = async (): Promise<BackupPayloadV4> => {
+export const exportBackup = async (): Promise<BackupPayloadV5> => {
   const [batchTemplates, productionRuns, noteEvents, technicians] =
     await Promise.all([
       db.batchTemplates.toArray(),
@@ -88,7 +100,8 @@ export const validateBackup = (payload: unknown): payload is BackupPayload => {
     record.schemaVersion !== 1 &&
     record.schemaVersion !== 2 &&
     record.schemaVersion !== 3 &&
-    record.schemaVersion !== 4
+    record.schemaVersion !== 4 &&
+    record.schemaVersion !== 5
   ) {
     return false
   }
@@ -119,11 +132,11 @@ export const validateBackup = (payload: unknown): payload is BackupPayload => {
   )
 }
 
-export const migrateBackup = (payload: BackupPayload): BackupPayloadV4 => {
+export const migrateBackup = (payload: BackupPayload): BackupPayloadV5 => {
   switch (payload.schemaVersion) {
     case 1:
       return {
-        schemaVersion: 4,
+        schemaVersion: 5,
         exportedAt: payload.exportedAt,
         data: {
           batchTemplates: payload.data.batchTemplates,
@@ -134,7 +147,7 @@ export const migrateBackup = (payload: BackupPayload): BackupPayloadV4 => {
       }
     case 2:
       return {
-        schemaVersion: 4,
+        schemaVersion: 5,
         exportedAt: payload.exportedAt,
         data: {
           batchTemplates: payload.data.batchTemplates,
@@ -145,7 +158,7 @@ export const migrateBackup = (payload: BackupPayload): BackupPayloadV4 => {
       }
     case 3:
       return {
-        schemaVersion: 4,
+        schemaVersion: 5,
         exportedAt: payload.exportedAt,
         data: {
           batchTemplates: payload.data.batchTemplates,
@@ -155,9 +168,11 @@ export const migrateBackup = (payload: BackupPayload): BackupPayloadV4 => {
         },
       }
     case 4:
+    case 5:
     default:
       return {
-        ...payload,
+        schemaVersion: 5,
+        exportedAt: payload.exportedAt,
         data: {
           ...payload.data,
           productionRuns: payload.data.productionRuns.map(normalizeProductionRun),

@@ -50,19 +50,33 @@ export default function Technicians() {
     [templates],
   )
 
-  const getTemplateName = (templateId: string) =>
-    templateMap.get(templateId) ?? 'Sin lote'
+  const getTemplateName = (templateId?: string) =>
+    templateId ? templateMap.get(templateId) ?? 'Sin lote' : 'Sin lote'
+
+  const getRunLabel = (run: ProductionRun) =>
+    run.runType === 'preparacion'
+      ? run.productionName?.trim() || 'Preparación'
+      : getTemplateName(run.templateId)
+
+  const getRunCode = (run: ProductionRun) =>
+    run.runType === 'preparacion' ? 'Preparación' : run.batchCode?.trim() || 'Sin código'
 
   const stats = useMemo(() => {
     return technicians.map((tech) => {
       const techRuns = runs.filter((run) => run.technician === tech.initials)
       const done = techRuns.filter((run) => run.status === 'completada').length
       const canceled = techRuns.filter((run) => run.status === 'cancelada').length
+      const lotes = techRuns.filter((run) => run.runType === 'lote').length
+      const preparaciones = techRuns.filter(
+        (run) => run.runType === 'preparacion',
+      ).length
       return {
         technician: tech,
         total: techRuns.length,
         done,
         canceled,
+        lotes,
+        preparaciones,
         runs: techRuns,
       }
     })
@@ -282,8 +296,8 @@ export default function Technicians() {
                     {item.technician.initials}
                   </div>
                   <div className="list-item-subtitle">
-                    Lotes: {item.total} · Completadas: {item.done} · Canceladas:{' '}
-                    {item.canceled}
+                    Lotes: {item.lotes} · Preparaciones: {item.preparaciones} ·
+                    Completadas: {item.done} · Canceladas: {item.canceled}
                   </div>
                   <button
                     className="ghost-button"
@@ -304,8 +318,8 @@ export default function Technicians() {
                             type="button"
                             onClick={() => handleOpenProduction(run)}
                           >
-                            <strong>{run.batchCode}</strong> · {run.date} ·{' '}
-                            {getTemplateName(run.templateId)}
+                            <strong>{getRunCode(run)}</strong> · {run.date} ·{' '}
+                            {getRunLabel(run)}
                             {run.notes ? ` — ${run.notes}` : ''}
                           </button>
                         ))}

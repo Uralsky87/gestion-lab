@@ -4,6 +4,7 @@ import type {
   BatchTemplate,
   NewProductionRun,
   ProductionRun,
+  ProductionRunType,
   ProductionShift,
   ProductionStatus,
   Technician,
@@ -28,8 +29,10 @@ type ProductionFormState = {
   id?: string
   date: string
   shift: ProductionShift
+  runType: ProductionRunType
   batchCode: string
   templateId: string
+  productionName: string
   plannedUnits: string
   actualUnits: string
   technician: string
@@ -42,8 +45,10 @@ type ProductionFormState = {
 const emptyForm = (templateId = ''): ProductionFormState => ({
   date: todayLocalIso(),
   shift: 'mañana',
+  runType: 'lote',
   batchCode: '',
   templateId,
+  productionName: '',
   plannedUnits: '',
   actualUnits: '',
   technician: '',
@@ -66,6 +71,10 @@ type ProductionConflictDialog = {
   replacementData: NewProductionRun
 }
 
+type SlotActionDialog = {
+  shift: ProductionShift
+}
+
 type ProductionFormMode = 'create' | 'replace'
 
 type ProductionViewMode = 'day' | 'calendar'
@@ -76,6 +85,11 @@ const statusLabels: Record<ProductionStatus, string> = {
   planificada: 'Planificada',
   completada: 'Completada',
   cancelada: 'Cancelada',
+}
+
+const runTypeLabels: Record<ProductionRunType, string> = {
+  lote: 'Lote',
+  preparacion: 'Preparación',
 }
 
 const getVisibleStatus = (status: ProductionStatus) => status
@@ -124,6 +138,8 @@ export default function Productions() {
   const [isQuickTemplateOpen, setIsQuickTemplateOpen] = useState(false)
   const [conflictDialog, setConflictDialog] =
     useState<ProductionConflictDialog | null>(null)
+  const [slotActionDialog, setSlotActionDialog] =
+    useState<SlotActionDialog | null>(null)
 
   const loadData = async () => {
     const [runData, templateData, techData] = await Promise.all([
@@ -135,7 +151,7 @@ export default function Productions() {
     setRuns(runData)
     setTemplates(sortedTemplates)
     setTechnicians(techData)
-    if (!form.templateId && sortedTemplates.length > 0) {
+    if (form.runType === 'lote' && !form.templateId && sortedTemplates.length > 0) {
       setForm((prev) => ({
         ...prev,
         templateId: sortedTemplates[0].id,
@@ -166,8 +182,18 @@ export default function Productions() {
     formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   }, [showForm])
 
-  const getTemplateName = (id: string) =>
-    templates.find((template) => template.id === id)?.name ?? 'Sin plantilla'
+  const getTemplateName = (id?: string) =>
+    id ? templates.find((template) => template.id === id)?.name ?? 'Sin plantilla' : 'Sin plantilla'
+
+  const getRunDisplayName = (run: ProductionRun) =>
+    run.runType === 'preparacion'
+      ? run.productionName?.trim() || 'Preparación'
+      : getTemplateName(run.templateId)
+
+  const getRunCodeLabel = (run: ProductionRun) =>
+    run.runType === 'preparacion'
+      ? 'Preparación'
+      : run.batchCode?.trim() || 'Sin código'
 
   const hasRunNotes = (run: ProductionRun) => Boolean(run.notes?.trim())
 
@@ -198,7 +224,7 @@ export default function Productions() {
     const content = kind === 'incidents' ? run.incidents?.trim() : run.notes?.trim()
     if (!content) return
     setNoteDialog({
-      title: `${run.batchCode} · ${getTemplateName(run.templateId)}`,
+      title: `${getRunCodeLabel(run)} · ${getRunDisplayName(run)}`,
       content: [content],
       kind,
     })
@@ -252,6 +278,7 @@ export default function Productions() {
     })
 
     const counts = recentRuns.reduce<Record<string, number>>((acc, run) => {
+      if (!run.templateId) return acc
       acc[run.templateId] = (acc[run.templateId] ?? 0) + 1
       return acc
     }, {})
@@ -279,6 +306,7 @@ export default function Productions() {
     }, {})
 
     const templateCounts = runs.reduce<Record<string, number>>((acc, run) => {
+      if (!run.templateId) return acc
       acc[run.templateId] = (acc[run.templateId] ?? 0) + 1
       return acc
     }, {})
@@ -309,24 +337,27 @@ export default function Productions() {
   const buildDefaultForm = (
     shift: ProductionShift,
     date = selectedDate,
+    runType: ProductionRunType = 'lote',
   ): ProductionFormState => ({
-    ...emptyForm(templates[0]?.id ?? ''),
+    ...emptyForm(runType === 'lote' ? templates[0]?.id ?? '' : ''),
     date,
     shift,
+    runType,
     technician: technicians[0]?.initials ?? '',
   })
 
   const describeRun = (run: ProductionRun) => {
-    const templateName = getTemplateName(run.templateId)
+    const templateName = getRunDisplayName(run)
     const statusLabel = statusLabels[getVisibleStatus(run.status)]
-    return `${run.batchCode} - ${templateName} - ${run.technician} - ${statusLabel}`
+    return `${getRunCodeLabel(run)} - ${templateName} - ${run.technician} - ${statusLabel}`
   }
 
-  const handleCreateInSlot = (shift: ProductionShift) => {
-    setForm(buildDefaultForm(shift))
+  const handleCreateInSlot = (shift: ProductionShift, runType: ProductionRunType) => {
+    setForm(buildDefaultForm(shift, selectedDate, runType))
     setFormMode('create')
     setError('')
     setShowForm(true)
+    setSlotActionDialog(null)
   }
 
   const handlePrevDay = () => {
@@ -383,10 +414,12 @@ export default function Productions() {
   }
 
   const handleSave = async () => {
+    const runType = form.runType
     const batchCode = form.batchCode.trim()
+    const productionName = form.productionName.trim()
     const technician = form.technician.trim()
     const plannedUnits = Number(form.plannedUnits)
-    const actualUnitsValue = form.actualUnits
+    const actualUnitsValue = runType === 'lote' && form.actualUnits
       ? Number(form.actualUnits)
       : undefined
     const changeReason = form.changeReason.trim()
@@ -396,12 +429,18 @@ export default function Productions() {
       setError('La fecha es obligatoria.')
       return
     }
-    if (!/^[0-9]{9}$/.test(batchCode)) {
-      setError('El código de lote debe tener exactamente 9 dígitos.')
-      return
+    if (runType === 'lote') {
+      if (!/^[0-9]{9}$/.test(batchCode)) {
+        setError('El código de lote debe tener exactamente 9 dígitos.')
+        return
+      }
+      if (!form.templateId) {
+        setError('Selecciona una plantilla.')
+        return
+      }
     }
-    if (!form.templateId) {
-      setError('Selecciona una plantilla.')
+    if (runType === 'preparacion' && !productionName) {
+      setError('El nombre de la preparación es obligatorio.')
       return
     }
     if (Number.isNaN(plannedUnits) || plannedUnits <= 0) {
@@ -453,10 +492,12 @@ export default function Productions() {
       : undefined
 
     const productionData: NewProductionRun = {
+      runType,
       date: form.date,
       shift: form.shift,
-      batchCode,
-      templateId: form.templateId,
+      batchCode: runType === 'lote' ? batchCode : undefined,
+      templateId: runType === 'lote' ? form.templateId : undefined,
+      productionName: runType === 'preparacion' ? productionName : undefined,
       plannedUnits,
       actualUnits: actualUnitsValue,
       technician,
@@ -495,7 +536,7 @@ export default function Productions() {
 
   const handleReplace = (run: ProductionRun) => {
     setForm({
-      ...buildDefaultForm(run.shift, run.date),
+      ...buildDefaultForm(run.shift, run.date, run.runType),
       id: run.id,
     })
     setFormMode('replace')
@@ -505,7 +546,7 @@ export default function Productions() {
 
   const handleDelete = async (run: ProductionRun) => {
     const confirmed = window.confirm(
-      `¿Eliminar producción ${run.batchCode}?`,
+      `¿Eliminar producción ${getRunCodeLabel(run)}?`,
     )
     if (!confirmed) return
     await deleteProductionRun(run.id)
@@ -646,7 +687,11 @@ export default function Productions() {
                           : 'empty'
                         return (
                           <div className="calendar-shift-row" key={shift}>
-                            <span className={`calendar-dot status-${status}`} />
+                            <span
+                              className={`calendar-dot${
+                                run?.runType === 'preparacion' ? ' is-preparation' : ''
+                              } status-${status}`}
+                            />
                           </div>
                         )
                       })}
@@ -654,6 +699,16 @@ export default function Productions() {
                   </button>
                 )
               })}
+            </div>
+            <div className="calendar-legend">
+              <div className="legend-item">
+                <span className="calendar-dot" />
+                <span>Lote</span>
+              </div>
+              <div className="legend-item">
+                <span className="calendar-dot is-preparation" />
+                <span>Preparación</span>
+              </div>
             </div>
           </div>
         ) : (
@@ -670,7 +725,7 @@ export default function Productions() {
                   <div className="production-slot-header">
                     <div>
                       <h3>{shift === 'mañana' ? 'Mañana' : 'Tarde'}</h3>
-                      <p>{run ? getTemplateName(run.templateId) : 'Sin producción'}</p>
+                      <p>{run ? getRunDisplayName(run) : 'Sin producción'}</p>
                     </div>
                     {run ? (
                       <span className={`status-badge status-${run.status}`}>
@@ -682,12 +737,17 @@ export default function Productions() {
                   {run ? (
                     <>
                       <div className="production-slot-body">
-                        <div className="list-item-title">{run.batchCode}</div>
+                        <div className="list-item-title">{getRunCodeLabel(run)}</div>
                         <div className="list-item-subtitle">
                           {run.technician} - Plan: {run.plannedUnits}
-                          {run.actualUnits != null ? ` - Real: ${run.actualUnits}` : ''}
+                          {run.runType === 'lote' && run.actualUnits != null
+                            ? ` - Real: ${run.actualUnits}`
+                            : ''}
                         </div>
                         <div className="tag-row">
+                          <span className="tag">
+                            {run.runType === 'preparacion' ? 'Preparación' : 'Lote'}
+                          </span>
                           {hasRunIncidents(run) ? (
                             <button
                               className="note-alert note-alert-incident"
@@ -761,10 +821,13 @@ export default function Productions() {
                     <button
                       className="add-slot-button"
                       type="button"
-                      onClick={() => handleCreateInSlot(shift)}
+                      onClick={() => setSlotActionDialog({ shift })}
                       aria-label={`Crear producción de ${shift}`}
                     >
-                      +
+                      <span className="add-slot-icon" aria-hidden="true">
+                        +
+                      </span>
+                      <span className="add-slot-label">Añadir</span>
                     </button>
                   )}
                 </article>
@@ -776,7 +839,15 @@ export default function Productions() {
 
       {showForm ? (
         <section className="card" ref={formRef}>
-          <h3>{form.id ? 'Editar producción' : 'Nueva producción'}</h3>
+          <h3>
+            {form.id
+              ? form.runType === 'preparacion'
+                ? 'Editar preparación'
+                : 'Editar lote'
+              : form.runType === 'preparacion'
+              ? 'Nueva preparación'
+              : 'Nuevo lote'}
+          </h3>
           {formMode === 'replace' ? (
             <p>Rellena la nueva producción y guarda el motivo del cambio.</p>
           ) : null}
@@ -814,62 +885,81 @@ export default function Productions() {
               <option value="tarde">Tarde</option>
             </select>
           </div>
-          <div className="form-row">
-            <label className="form-label" htmlFor="batchCode">
-              Código de lote (9 dígitos)
-            </label>
-            <input
-              id="batchCode"
-              className="form-input"
-              inputMode="numeric"
-              pattern="[0-9]*"
-              maxLength={9}
-              value={form.batchCode}
-              onChange={(event) =>
-                setForm((prev) => ({
-                  ...prev,
-                  batchCode: event.target.value.replace(/\D/g, ''),
-                }))
-              }
-              placeholder="000000000"
-            />
-          </div>
-          <div className="form-row">
-            <label className="form-label" htmlFor="templateId">
-              Lote
-            </label>
-            <div className="template-select-row">
-              <select
-                id="templateId"
+          {form.runType === 'lote' ? (
+            <>
+              <div className="form-row">
+                <label className="form-label" htmlFor="batchCode">
+                  Código de lote (9 dígitos)
+                </label>
+                <input
+                  id="batchCode"
+                  className="form-input"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={9}
+                  value={form.batchCode}
+                  onChange={(event) =>
+                    setForm((prev) => ({
+                      ...prev,
+                      batchCode: event.target.value.replace(/\D/g, ''),
+                    }))
+                  }
+                  placeholder="000000000"
+                />
+              </div>
+              <div className="form-row">
+                <label className="form-label" htmlFor="templateId">
+                  Lote
+                </label>
+                <div className="template-select-row">
+                  <select
+                    id="templateId"
+                    className="form-input"
+                    value={form.templateId}
+                    onChange={(event) =>
+                      setForm((prev) => ({ ...prev, templateId: event.target.value }))
+                    }
+                  >
+                    {templates.length === 0 ? (
+                      <option value="">Sin lotes</option>
+                    ) : null}
+                    {templates.map((template) => (
+                      <option key={template.id} value={template.id}>
+                        {template.name}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="secondary-button quick-template-button"
+                    type="button"
+                    onClick={() => {
+                      setQuickTemplateError('')
+                      setIsQuickTemplateOpen(true)
+                    }}
+                    aria-label="Crear lote"
+                    title="Crear lote"
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            </>
+          ) : (
+            <div className="form-row">
+              <label className="form-label" htmlFor="productionName">
+                Nombre de la preparación
+              </label>
+              <input
+                id="productionName"
                 className="form-input"
-                value={form.templateId}
+                value={form.productionName}
                 onChange={(event) =>
-                  setForm((prev) => ({ ...prev, templateId: event.target.value }))
+                  setForm((prev) => ({ ...prev, productionName: event.target.value }))
                 }
-              >
-                {templates.length === 0 ? (
-                  <option value="">Sin lotes</option>
-                ) : null}
-                {templates.map((template) => (
-                  <option key={template.id} value={template.id}>
-                    {template.name}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="secondary-button quick-template-button"
-                type="button"
-                onClick={() => {
-                  setQuickTemplateError('')
-                  setIsQuickTemplateOpen(true)
-                }}
-                aria-label="Crear lote"
-                title="Crear lote"
-              >
-                +
-              </button>
+                placeholder="Ej. Mezcla base chocolate"
+              />
             </div>
-          </div>
+          )}
           <div className="form-row">
             <label className="form-label" htmlFor="plannedUnits">
               Unidades planificadas
@@ -889,25 +979,27 @@ export default function Productions() {
               placeholder="120"
             />
           </div>
-          <div className="form-row">
-            <label className="form-label" htmlFor="actualUnits">
-              Unidades reales (opcional)
-            </label>
-            <input
-              id="actualUnits"
-              className="form-input"
-              type="number"
-              min={0}
-              value={form.actualUnits}
-              onChange={(event) =>
-                setForm((prev) => ({
-                  ...prev,
-                  actualUnits: event.target.value,
-                }))
-              }
-              placeholder="118"
-            />
-          </div>
+          {form.runType === 'lote' ? (
+            <div className="form-row">
+              <label className="form-label" htmlFor="actualUnits">
+                Unidades reales (opcional)
+              </label>
+              <input
+                id="actualUnits"
+                className="form-input"
+                type="number"
+                min={0}
+                value={form.actualUnits}
+                onChange={(event) =>
+                  setForm((prev) => ({
+                    ...prev,
+                    actualUnits: event.target.value,
+                  }))
+                }
+                placeholder="118"
+              />
+            </div>
+          ) : null}
           <div className="form-row">
             <label className="form-label" htmlFor="technician">
               Técnico
@@ -1273,11 +1365,17 @@ export default function Productions() {
                 {conflictDialog.existingRun.date} · {conflictDialog.existingRun.shift}
               </p>
               <p className="note-text">
-                Lote actual: {getTemplateName(conflictDialog.existingRun.templateId)}
+                Actual: {getRunDisplayName(conflictDialog.existingRun)}
               </p>
               <p className="note-text">
-                Código: {conflictDialog.existingRun.batchCode} · Técnico:{' '}
+                Tipo actual: {runTypeLabels[conflictDialog.existingRun.runType]}
+              </p>
+              <p className="note-text">
+                Código: {getRunCodeLabel(conflictDialog.existingRun)} · Técnico:{' '}
                 {conflictDialog.existingRun.technician}
+              </p>
+              <p className="note-text">
+                Nuevo tipo: {runTypeLabels[conflictDialog.replacementData.runType]}
               </p>
               <p className="note-text">
                 Estado: {conflictDialog.existingRun.status}
@@ -1297,6 +1395,52 @@ export default function Productions() {
                 onClick={() => void handleConfirmConflictSwap()}
               >
                 Intercambiar
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {slotActionDialog ? (
+        <div
+          className="note-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setSlotActionDialog(null)}
+        >
+          <div
+            className="note-modal"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div className="note-modal-header">
+              <h4>
+                Crear producción en turno {slotActionDialog.shift === 'mañana' ? 'mañana' : 'tarde'}
+              </h4>
+              <button
+                className="ghost-button"
+                type="button"
+                onClick={() => setSlotActionDialog(null)}
+              >
+                Cerrar
+              </button>
+            </div>
+            <p className="note-text">
+              Elige tipo. Solo puede haber un registro por turno.
+            </p>
+            <div className="form-actions">
+              <button
+                className="primary-button"
+                type="button"
+                onClick={() => handleCreateInSlot(slotActionDialog.shift, 'lote')}
+              >
+                Añadir lote
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={() => handleCreateInSlot(slotActionDialog.shift, 'preparacion')}
+              >
+                Añadir preparación
               </button>
             </div>
           </div>

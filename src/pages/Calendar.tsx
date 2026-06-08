@@ -51,7 +51,18 @@ export default function Calendar() {
     return new Map(templates.map((template) => [template.id, template.name]))
   }, [templates])
 
-  const getTemplateName = (id: string) => templateMap.get(id) ?? 'Sin plantilla'
+  const getTemplateName = (id?: string) =>
+    id ? templateMap.get(id) ?? 'Sin plantilla' : 'Sin plantilla'
+
+  const getRunDisplayName = (run: ProductionRun) =>
+    run.runType === 'preparacion'
+      ? run.productionName?.trim() || 'Preparación'
+      : getTemplateName(run.templateId)
+
+  const getRunCodeLabel = (run: ProductionRun) =>
+    run.runType === 'preparacion'
+      ? 'Preparación'
+      : run.batchCode?.trim() || 'Sin código'
 
   const hasRunNotes = (run: ProductionRun) => Boolean(run.notes?.trim())
 
@@ -68,13 +79,15 @@ export default function Calendar() {
     const query = search.trim().toLowerCase()
     if (!query) return runs
     return runs.filter((run) => {
-      const templateName = getTemplateName(run.templateId).toLowerCase()
+      const templateName = getRunDisplayName(run).toLowerCase()
       const technician = run.technician.toLowerCase()
-      const batchCode = run.batchCode.toLowerCase()
+      const batchCode = run.batchCode?.toLowerCase() ?? ''
+      const productionName = run.productionName?.toLowerCase() ?? ''
       return (
         templateName.includes(query) ||
         technician.includes(query) ||
-        batchCode.includes(query)
+        batchCode.includes(query) ||
+        productionName.includes(query)
       )
     })
   }, [search, runs, templateMap])
@@ -108,7 +121,7 @@ export default function Calendar() {
     const content = kind === 'incidents' ? run.incidents?.trim() : run.notes?.trim()
     if (!content) return
     setNoteDialog({
-      title: `${getTemplateName(run.templateId)} · ${run.shift}`,
+      title: `${getRunDisplayName(run)} · ${run.shift}`,
       content: [content],
       kind,
     })
@@ -130,7 +143,7 @@ export default function Calendar() {
 
   const handleDeleteRun = async (run: ProductionRun) => {
     const confirmed = window.confirm(
-      `¿Eliminar la producción ${run.batchCode} del ${run.date} (${run.shift})?`,
+      `¿Eliminar la producción ${getRunCodeLabel(run)} del ${run.date} (${run.shift})?`,
     )
     if (!confirmed) return
 
@@ -169,7 +182,7 @@ export default function Calendar() {
             id="calendarSearch"
             className="form-input"
             type="search"
-            placeholder="Lote, técnico o batchCode"
+            placeholder="Lote, preparación, técnico o código"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -209,6 +222,12 @@ export default function Calendar() {
             const isSelected = selectedDate === dateKey
             const morningStatus = getShiftStatus(filteredDayRuns, 'mañana')
             const afternoonStatus = getShiftStatus(filteredDayRuns, 'tarde')
+            const morningHasPreparation = filteredDayRuns.some(
+              (run) => run.shift === 'mañana' && run.runType === 'preparacion',
+            )
+            const afternoonHasPreparation = filteredDayRuns.some(
+              (run) => run.shift === 'tarde' && run.runType === 'preparacion',
+            )
             const morningHasIncidents = filteredDayRuns.some(
               (run) => run.shift === 'mañana' && run.incidents?.trim(),
             )
@@ -230,7 +249,11 @@ export default function Calendar() {
                 <span className="calendar-day-number">{day.getDate()}</span>
                 <div className="calendar-dots">
                   <div className="calendar-shift-row">
-                    <span className={`calendar-dot status-${morningStatus}`} />
+                    <span
+                      className={`calendar-dot status-${morningStatus}${
+                        morningHasPreparation ? ' is-preparation' : ''
+                      }`}
+                    />
                     {morningHasIncidents ? (
                       <span className="calendar-note-dot" aria-hidden="true">
                         !
@@ -238,7 +261,11 @@ export default function Calendar() {
                     ) : null}
                   </div>
                   <div className="calendar-shift-row">
-                    <span className={`calendar-dot status-${afternoonStatus}`} />
+                    <span
+                      className={`calendar-dot status-${afternoonStatus}${
+                        afternoonHasPreparation ? ' is-preparation' : ''
+                      }`}
+                    />
                     {afternoonHasIncidents ? (
                       <span className="calendar-note-dot" aria-hidden="true">
                         !
@@ -263,6 +290,14 @@ export default function Calendar() {
             <span className="calendar-dot status-cancelada" />
             <span>Cancelada</span>
           </div>
+          <div className="legend-item">
+            <span className="calendar-dot" />
+            <span>Lote</span>
+          </div>
+          <div className="legend-item">
+            <span className="calendar-dot is-preparation" />
+            <span>Preparación</span>
+          </div>
         </div>
       </section>
 
@@ -278,12 +313,15 @@ export default function Calendar() {
               <article key={run.id} className="list-item">
                 <div className="list-item-main">
                   <div className="list-item-title">
-                    {getTemplateName(run.templateId)} · {run.shift}
+                    {getRunDisplayName(run)} · {run.shift}
                   </div>
                   <div className="list-item-subtitle">
-                    {run.batchCode} · {run.technician}
+                    {getRunCodeLabel(run)} · {run.technician}
                   </div>
                   <div className="tag-row">
+                    <span className="tag">
+                      {run.runType === 'preparacion' ? 'Preparación' : 'Lote'}
+                    </span>
                     {hasRunIncidents(run) ? (
                       <button
                         className="note-alert note-alert-incident"
@@ -370,10 +408,10 @@ export default function Calendar() {
               >
                 <div className="list-item-main">
                   <div className="list-item-title">
-                    {run.date} · {getTemplateName(run.templateId)}
+                    {run.date} · {getRunDisplayName(run)}
                   </div>
                   <div className="list-item-subtitle">
-                    {run.shift} · {run.technician} · {run.batchCode}
+                    {run.shift} · {run.technician} · {getRunCodeLabel(run)}
                   </div>
                 </div>
                 <span className={`status-badge status-${run.status}`}>

@@ -1,6 +1,7 @@
 import { db } from './db'
 import {
   normalizeProductionRun,
+  normalizeProductionRunType,
   normalizeProductionShift,
   normalizeProductionStatus,
 } from './models'
@@ -66,8 +67,10 @@ export async function createProductionRun(
     id: ensureId(input.id),
     date: input.date,
     shift: normalizeProductionShift(input.shift),
-    batchCode: input.batchCode,
-    templateId: input.templateId,
+    runType: normalizeProductionRunType(input.runType),
+    batchCode: input.batchCode?.trim() || undefined,
+    templateId: input.templateId?.trim() || undefined,
+    productionName: input.productionName?.trim() || undefined,
     plannedUnits: input.plannedUnits,
     actualUnits: input.actualUnits,
     technician: input.technician,
@@ -95,6 +98,9 @@ export async function updateProductionRun(
   }
   if (changes.shift) {
     normalizedChanges.shift = normalizeProductionShift(changes.shift)
+  }
+  if (changes.runType) {
+    normalizedChanges.runType = normalizeProductionRunType(changes.runType)
   }
   await db.productionRuns.update(id, normalizedChanges)
   const run = await db.productionRuns.get(id)

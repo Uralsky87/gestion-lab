@@ -15,6 +15,7 @@ export type BatchTemplate = {
 export type ProductionShift = 'mañana' | 'tarde'
 export type LegacyProductionShift = 'ma\u00c3\u00b1ana'
 export type ProductionStatus = 'planificada' | 'completada' | 'cancelada'
+export type ProductionRunType = 'lote' | 'preparacion'
 export type LegacyProductionStatus =
   | 'previsto'
   | 'hecho'
@@ -31,8 +32,10 @@ export type ProductionRun = {
   id: string
   date: string
   shift: ProductionShift
-  batchCode: string
-  templateId: string
+  runType: ProductionRunType
+  batchCode?: string
+  templateId?: string
+  productionName?: string
   plannedUnits: number
   actualUnits?: number
   technician: string
@@ -66,12 +69,23 @@ export const normalizeProductionShift = (
   shift: ProductionShift | LegacyProductionShift | string,
 ): ProductionShift => (shift === 'tarde' ? 'tarde' : 'mañana')
 
-export const normalizeProductionRun = <T extends { shift: string; status: string }>(
+export const normalizeProductionRunType = (
+  runType: ProductionRunType | string | undefined,
+): ProductionRunType => (runType === 'preparacion' ? 'preparacion' : 'lote')
+
+export const normalizeProductionRun = <
+  T extends { shift: string; status: string; runType?: string },
+>(
   run: T,
-): T & { shift: ProductionShift; status: ProductionStatus } => ({
+): T & {
+  shift: ProductionShift
+  status: ProductionStatus
+  runType: ProductionRunType
+} => ({
   ...run,
   shift: normalizeProductionShift(run.shift),
   status: normalizeProductionStatus(run.status),
+  runType: normalizeProductionRunType(run.runType),
 })
 
 export type NoteCategory =
